@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>garmin dashboard</title>
+<style>
+  :root {
+    --bg: #08080A;
+    --panel: #08080A;
+    --text: #F5F5F5;
+    --grey-1: #B4B4B8;   /* Sekundärtext 9,7:1 */
+    --grey-2: #8E8E93;   /* Achsen, Hinweise 6,1:1 */
+    --grey-3: #5A5A60;   /* nur Grafik (Achsenlinie), kein Text */
+    --line: #2A2A2E;     /* Modulraster */
+    --grid: #1C1C20;     /* Diagrammgitter, rein dekorativ */
+    --blue: #3D7BFF;     /* HRV, Trainingsumfang */
+    --red: #F0402F;      /* Puls */
+    --yellow: #FFC400;   /* Schlaf */
+    --green: #00C46A;    /* Energie, Stress, Body Battery */
+    --white: #F5F5F5;    /* Hervorhebung */
+    --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; border-radius: 0 !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.5; }
+  body { overflow-x: hidden; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  .lc { text-transform: lowercase; letter-spacing: 0.02em; }
+  .num { font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .mark { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: 0; flex-shrink: 0; }
+  h1, h2, h3 { margin: 0; font-weight: 700; text-transform: lowercase; letter-spacing: 0.01em; }
+  h2 { font-size: 15px; display: flex; align-items: center; }
+  p { margin: 0; }
+  .muted { color: var(--grey-1); }
+  .small { font-size: 13px; }
+  a { color: var(--grey-1); }
+
+  /* Kopf */
+  header { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: flex-end; padding: 28px 24px 20px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 22px; display: flex; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); }
+  .seg button { background: transparent; color: var(--grey-1); border: 0; border-right: 1px solid var(--line); padding: 8px 16px; font: inherit; font-size: 13px; cursor: pointer; text-transform: lowercase; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); font-weight: 700; }
+  .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  /* Raster aus dünnen Linien zwischen allen Modulen */
+  .grid { display: grid; gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
+  .grid > * { background: var(--bg); padding: 24px; min-width: 0; }
+  .top { grid-template-columns: 2fr 1fr; }
+  .tiles { grid-template-columns: repeat(4, 1fr); }
+  .two { grid-template-columns: 1fr 1fr; }
+  .full { grid-template-columns: 1fr; }
+  @media (max-width: 900px) { .top, .two { grid-template-columns: 1fr; } .tiles { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 520px) { .tiles { grid-template-columns: 1fr; } .grid > * { padding: 18px 16px; } header { padding: 20px 16px 16px; } }
+
+  /* Hero */
+  .hero-num { font-size: clamp(72px, 14vw, 132px); line-height: 0.9; }
+  .hero-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; margin: 18px 0 20px; }
+  .scale { position: relative; height: 14px; display: grid; grid-template-columns: 24fr 25fr 25fr 20fr 6fr; gap: 2px; margin: 8px 0 6px; }
+  .scale span { background: #17171B; }
+  .scale .pin { position: absolute; top: -6px; width: 4px; height: 26px; background: var(--white); transform: translateX(-2px); }
+  .scale-labels { display: grid; grid-template-columns: 24fr 25fr 25fr 20fr 6fr; gap: 2px; font-size: 11px; color: var(--grey-2); }
+
+  /* Randspalte */
+  .side dl { margin: 16px 0 0; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .side .row { background: var(--bg); padding: 12px 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .side dt { color: var(--grey-1); font-size: 13px; display: flex; align-items: center; text-transform: lowercase; }
+  .side dd { margin: 0; font-size: 22px; }
+  .side dd small { font-size: 12px; color: var(--grey-1); font-weight: 400; letter-spacing: 0; margin-left: 3px; }
+
+  /* Kacheln */
+  .tile .label { display: flex; align-items: center; font-size: 13px; color: var(--grey-1); text-transform: lowercase; }
+  .tile .val { font-size: 40px; margin-top: 8px; line-height: 1; }
+  .tile .val small { font-size: 14px; color: var(--grey-1); font-weight: 400; letter-spacing: 0; margin-left: 4px; }
+  .tile .delta { font-size: 13px; margin-top: 6px; color: var(--grey-1); min-height: 20px; }
+  .tile .delta.hl { color: var(--white); font-weight: 700; }
+  .tile .delta.hl::before { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--white); margin-right: 6px; }
+  .tile svg { display: block; margin-top: 12px; }
+
+  /* Diagramme */
+  .chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .explain { color: var(--grey-1); font-size: 13px; margin: 8px 0 14px; max-width: 70ch; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .axis { fill: var(--grey-2); font-size: 11px; font-family: var(--font); }
+  .gridline { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+  .baseline { stroke: var(--grey-3); stroke-width: 1; shape-rendering: crispEdges; }
+  .ref { stroke: var(--grey-1); stroke-width: 1; shape-rendering: crispEdges; }
+  .ref-label { fill: var(--grey-1); font-size: 11px; }
+  .endlabel { font-size: 12px; font-weight: 700; fill: var(--white); letter-spacing: -0.02em; }
+  .cross { stroke: var(--grey-1); stroke-width: 1; shape-rendering: crispEdges; pointer-events: none; }
+  .tip { position: absolute; pointer-events: none; background: var(--bg); border: 1px solid var(--grey-1); padding: 8px 10px; font-size: 12px; white-space: nowrap; opacity: 0; z-index: 5; }
+  .tip.show { opacity: 1; }
+  .tip b { font-weight: 700; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--grey-1); margin-top: 10px; }
+  .legend span { display: inline-flex; align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; }
+
+  /* Animation: einmal einzeichnen / aufwachsen */
+  .grow { transform-box: fill-box; transform-origin: 50% 100%; animation: grow 0.7s ease-out both; }
+  @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  @media (prefers-reduced-motion: reduce) { .grow { animation: none; } }
+
+  /* Tabellen */
+  .tablewrap { overflow-x: auto; margin-top: 14px; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child, th.l, td.l { text-align: left; }
+  th { color: var(--grey-1); font-weight: 400; text-transform: lowercase; border-bottom: 1px solid var(--grey-3); }
+  td.num { font-weight: 700; }
+  td .nd { color: var(--grey-2); font-weight: 400; }
+  details summary { cursor: pointer; list-style: none; display: flex; align-items: center; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after { content: "+"; margin-left: 10px; color: var(--grey-1); font-weight: 400; }
+  details[open] summary::after { content: "−"; }
+
+  footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 24px 28px; border-top: 1px solid var(--line); font-size: 12px; color: var(--grey-1); }
+  footer a { color: var(--grey-1); text-decoration: none; border-bottom: 1px solid var(--grey-3); }
+  footer a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span class="mark" style="background:var(--white)"></span>garmin</h1>
+      <p class="small muted" id="updated"></p>
+    </div>
+    <div class="seg" role="group" aria-label="Zeitraum">
+      <button type="button" data-range="14">14 tage</button>
+      <button type="button" data-range="30">30 tage</button>
+      <button type="button" data-range="60">60 tage</button>
+    </div>
+  </header>
+
+  <section class="grid top">
+    <div id="hero"></div>
+    <div class="side" id="side"></div>
+  </section>
+
+  <section class="grid tiles" id="tiles"></section>
+
+  <section class="grid full">
+    <div>
+      <div class="chart-head"><h2><span class="mark" style="background:var(--blue)"></span>herzfrequenzvariabilität</h2><span class="small muted" id="hrv-sum"></span></div>
+      <p class="explain">Die HRV ist die Schwankung zwischen zwei Herzschlägen in der Nacht, gemessen in Millisekunden. Höhere Werte bedeuten meist, dass das Nervensystem gut erholt ist. Das helle Band zeigt deinen üblichen Bereich in diesem Zeitraum (Mittelwert ± eine Standardabweichung). Werte darunter deuten auf Belastung, wenig Schlaf, Alkohol oder einen beginnenden Infekt hin.</p>
+      <div class="chart" id="c-hrv"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div>
+      <h2><span class="mark" style="background:var(--red)"></span>ruhepuls</h2>
+      <p class="explain">Der niedrigste Puls des Tages in Ruhe. Ein Anstieg um mehrere Schläge über deinen Normalwert ist oft ein frühes Zeichen für Ermüdung oder Krankheit.</p>
+      <div class="chart" id="c-rhr"></div>
+    </div>
+    <div>
+      <h2><span class="mark" style="background:var(--yellow)"></span>schlaf</h2>
+      <p class="explain">Schlafdauer pro Nacht. Die Linie markiert 7 Stunden, die Untergrenze der Empfehlung für Erwachsene. Weiße Säulen mit Quadrat sind kürzere Nächte.</p>
+      <div class="chart" id="c-sleep"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div>
+      <h2><span class="mark" style="background:var(--green)"></span>body battery</h2>
+      <p class="explain">Garmins Energiewert von 0 bis 100. Jede Säule reicht vom Tiefst- bis zum Höchstwert des Tages. Weiß sind schwache Tage, an denen der Höchstwert unter 50 blieb, an denen du dich also nicht richtig aufladen konntest.</p>
+      <div class="chart" id="c-bb"></div>
+    </div>
+    <div>
+      <h2><span class="mark" style="background:var(--blue)"></span>wochenkilometer</h2>
+      <p class="explain">Summe der Distanz deiner Lauf- und Radeinheiten je Kalenderwoche, ohne E-Bike, weil der Motor die Kilometer nicht mit Training vergleichbar macht. Die laufende Woche ist weiß, weil sie noch nicht abgeschlossen ist.</p>
+      <div class="chart" id="c-km"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div>
+      <div class="chart-head"><h2><span class="mark" style="background:var(--green)"></span>schritte</h2><span class="small muted" id="steps-sum"></span></div>
+      <p class="explain">Schritte pro Tag, vor allem Alltagsbewegung wie dein Schultag. Für Erwachsene unter 60 sinkt das Sterberisiko mit mehr Schritten bis etwa 8.000 bis 10.000 pro Tag, darüber kaum noch weiter (Paluch et al., Lancet Public Health 2022). Die Linie markiert 8.000. Ein Trainingsreiz für deine Ausdauer ist das nicht, wohl aber Energieverbrauch.</p>
+      <div class="chart" id="c-steps"></div>
+    </div>
+    <div>
+      <div class="chart-head"><h2><span class="mark" style="background:var(--green)"></span>e-bike</h2><span class="small muted" id="ebike-sum"></span></div>
+      <p class="explain">Minuten auf dem E-Bike je Kalenderwoche. Mit Puls um 100 bis 120 ist das lockere Bewegung im untersten Bereich, eher aktive Erholung als Training. Sie zählt aber für Energieverbrauch und Gesundheit. Die laufende Woche ist weiß.</p>
+      <div class="chart" id="c-ebike"></div>
+    </div>
+  </section>
+
+  <section class="grid full">
+    <div>
+      <h2><span class="mark" style="background:var(--blue)"></span>logbuch</h2>
+      <p class="explain">Deine letzten Einheiten im Zeitraum. Pace in Minuten pro Kilometer, beim E-Bike bewusst ohne Pace. Der aerobe Trainingseffekt (0 bis 5) zeigt, wie stark die Einheit deine Grundlagenausdauer gefordert hat. Ab 3 gilt sie als verbessernd.</p>
+      <div class="tablewrap"><table id="log"></table></div>
+    </div>
+  </section>
+
+  <section class="grid full">
+    <details>
+      <summary><h2><span class="mark" style="background:var(--grey-1)"></span>rohdaten</h2></summary>
+      <p class="explain">Alle Tageswerte des gewählten Zeitraums. „–“ heißt keine Daten, nicht null.</p>
+      <div class="tablewrap"><table id="raw"></table></div>
+    </details>
+  </section>
+
+  <footer>
+    <span>Sport KI 01</span>
+    <span>Setup von @felsr — <a href="https://felsr.com" target="_blank" rel="noopener">felsr.com</a></span>
+  </footer>
+</div>
+
+<script>
+const DATA = /*__DATA__*/{"tage":{},"workouts":{}}/*__END__*/;
+</script>
+<script>
+(() => {
+"use strict";
+const C = { blue: "#3D7BFF", red: "#F0402F", yellow: "#FFC400", green: "#00C46A", white: "#F5F5F5" };
+const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const SD_THRESHOLD = 0.6; // Hervorhebung erst ab 0,6 Standardabweichungen
+let range = 30;
+let firstRender = true;
+
+// ---------- Helfer
+const $ = (id) => document.getElementById(id);
+const fmt = (v, d = 0) => v == null || Number.isNaN(v) ? "–" : Number(v).toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+const mean = (a) => { const v = a.filter((x) => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+const sd = (a) => { const v = a.filter((x) => x != null); if (v.length < 3) return null; const m = mean(v); return Math.sqrt(v.reduce((s, x) => s + (x - m) ** 2, 0) / (v.length - 1)); };
+const lastVal = (arr) => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return { v: arr[i], i }; return null; };
+const parse = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const WD = ["so", "mo", "di", "mi", "do", "fr", "sa"];
+const dShort = (s) => { const d = parse(s); return `${d.getDate()}.${d.getMonth() + 1}.`; };
+const dLong = (s) => { const d = parse(s); return `${WD[d.getDay()]}, ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`; };
+const isoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const n = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - n); const y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return { w: Math.ceil(((t - y) / 864e5 + 1) / 7), y: t.getUTCFullYear() }; };
+const monday = (d) => addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), -((d.getDay() + 6) % 7));
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) if (v != null) e.setAttribute(k, v); if (parent) parent.appendChild(e); return e; };
+const isEbike = (a) => /e_bike/.test(a.typ || "");
+const isTrainingKm = (a) => !isEbike(a) && /run|cycl|bik|ride/.test(a.typ || "");
+const pace = (a) => { if (isEbike(a)) return null; if (!a.distanz_km || !a.dauer_min) return null; const s = a.dauer_min * 60 / a.distanz_km; return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`; };
+const hours = (h) => { if (h == null) return "–"; const m = Math.round(h * 60); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`; };
+
+// ---------- Daten aufbereiten
+const allDays = Object.keys(DATA.tage).sort();
+const lastDate = allDays.length ? parse(allDays[allDays.length - 1]) : new Date();
+const workouts = Object.values(DATA.workouts || {}).sort((a, b) => String(b.start).localeCompare(String(a.start)));
+const g = (day, path) => { let o = DATA.tage[day]; for (const p of path) { if (o == null) return null; o = o[p]; } return o ?? null; };
+const METRICS = {
+  hrv: (d) => g(d, ["hrv", "nacht_ms"]),
+  rhr: (d) => g(d, ["ruhepuls"]),
+  sleep: (d) => g(d, ["schlaf", "dauer_h"]),
+  stress: (d) => g(d, ["stress"]),
+  bbHigh: (d) => g(d, ["body_battery", "hoch"]),
+  bbLow: (d) => g(d, ["body_battery", "tief"]),
+  tr: (d) => g(d, ["training_readiness", "score"]),
+  trLevel: (d) => g(d, ["training_readiness", "stufe"]),
+  steps: (d) => g(d, ["schritte"]),
+  sleepScore: (d) => g(d, ["schlaf", "score"]),
+};
+function period(n, offset = 0) {
+  const end = addDays(lastDate, -offset);
+  return Array.from({ length: n }, (_, i) => iso(addDays(end, -(n - 1 - i))));
+}
+const series = (days, key) => days.map((d) => METRICS[key](d));
+
+// ---------- Hero: Training Readiness
+function renderHero(days) {
+  const tr = series(days, "tr");
+  const last = lastVal(tr);
+  const avg = mean(tr);
+  const s = sd(tr);
+  const host = $("hero");
+  if (!last) { host.innerHTML = `<h2><span class="mark" style="background:var(--green)"></span>training readiness</h2><p class="explain">Im Zeitraum liegen keine Readiness-Werte vor.</p>`; return; }
+  const day = days[last.i];
+  const diff = avg != null ? last.v - avg : null;
+  const notable = diff != null && s && Math.abs(diff) > SD_THRESHOLD * s;
+  const verdict = diff == null ? "" : Math.abs(diff) < 1 ? "genau auf deinem Durchschnitt" : `${fmt(Math.abs(diff))} Punkte ${diff > 0 ? "über" : "unter"} deinem Durchschnitt von ${fmt(avg)}`;
+  const levels = { PRIME: "optimal", HIGH: "hoch", MODERATE: "moderat", LOW: "niedrig", POOR: "schwach" };
+  const lvl = METRICS.trLevel(day);
+  host.innerHTML = `
+    <h2><span class="mark" style="background:var(--green)"></span>training readiness</h2>
+    <div class="hero-row">
+      <div class="hero-num num" style="color:var(--text)">${fmt(last.v)}</div>
+      <div>
+        <div class="lc" style="font-size:18px;font-weight:700">${levels[lvl] || (lvl ? String(lvl).toLowerCase() : "")}</div>
+        <div class="small muted">${dLong(day)}${last.i !== days.length - 1 ? " (letzter Wert)" : ""}</div>
+        <div class="small" style="margin-top:6px;${notable ? "color:var(--white);font-weight:700" : "color:var(--grey-1)"}">${verdict}${notable ? " – deutliche Abweichung" : ""}</div>
+      </div>
+    </div>
+    <div class="scale" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><div class="pin" style="left:${Math.max(0, Math.min(100, last.v))}%"></div></div>
+    <div class="scale-labels lc"><span>schwach</span><span>niedrig</span><span>moderat</span><span>hoch</span><span>opt.</span></div>
+    <p class="explain" style="margin-top:14px">Garmins Bereitschaftswert von 0 bis 100 fasst Schlaf, HRV, Erholungszeit und die Belastung der letzten Tage zusammen. Er sagt, wie gut dein Körper heute eine harte Einheit verkraftet. Die Einordnung vergleicht mit deinem eigenen Durchschnitt im gewählten Zeitraum. Hervorgehoben wird erst ab einer deutlichen Abweichung (mehr als 0,6 Standardabweichungen).</p>`;
+}
+
+// ---------- Randspalte
+function renderSide(days) {
+  const items = [
+    ["schlaf", "yellow", lastVal(series(days, "sleep")), (v) => `${hours(v)}<small>h</small>`],
+    ["hrv", "blue", lastVal(series(days, "hrv")), (v) => `${fmt(v)}<small>ms</small>`],
+    ["ruhepuls", "red", lastVal(series(days, "rhr")), (v) => `${fmt(v)}<small>bpm</small>`],
+    ["body battery", "green", lastVal(series(days, "bbHigh")), (v) => `${fmt(v)}<small>max</small>`],
+  ];
+  const last7 = period(7);
+  const km7 = workouts.filter((a) => isTrainingKm(a) && last7.includes(a.datum)).reduce((s, a) => s + (a.distanz_km || 0), 0);
+  $("side").innerHTML = `
+    <h2><span class="mark" style="background:var(--white)"></span>aktuell</h2>
+    <dl>${items.map(([l, c, lv, f]) => `<div class="row"><dt><span class="mark" style="background:var(--${c})"></span>${l}</dt><dd class="num">${lv ? f(lv.v) : "–"}</dd></div>`).join("")}
+      <div class="row"><dt><span class="mark" style="background:var(--blue)"></span>distanz 7 tage</dt><dd class="num">${fmt(km7, 1)}<small>km</small></dd></div>
+    </dl>
+    <p class="small muted" style="margin-top:12px">Jeweils der letzte vorhandene Wert. Distanz nur aus Lauf- und Radeinheiten, ohne E-Bike.</p>`;
+}
+
+// ---------- Kacheln
+function renderTiles(days) {
+  const prev = period(days.length, days.length);
+  const defs = [
+    ["hrv", "hrv", "blue", "ms", 0, "höher ist meist besser"],
+    ["ruhepuls", "rhr", "red", "bpm", 0, "niedriger ist meist besser"],
+    ["schlaf", "sleep", "yellow", "h", 1, "Stunden pro Nacht"],
+    ["stress", "stress", "green", "", 0, "Tagesdurchschnitt 0–100"],
+  ];
+  const host = $("tiles");
+  host.innerHTML = "";
+  for (const [label, key, color, unit, dig, hint] of defs) {
+    const cur = series(days, key), before = series(prev, key);
+    const lv = lastVal(cur);
+    const m1 = mean(cur), m0 = mean(before), s = sd(cur);
+    let delta = "Vorperiode: keine Daten";
+    let hl = false;
+    if (m1 != null && m0 != null && before.filter((x) => x != null).length >= 3) {
+      const d = m1 - m0;
+      hl = s != null && Math.abs(d) > SD_THRESHOLD * s;
+      delta = key === "sleep"
+        ? `${d >= 0 ? "+" : "−"}${fmt(Math.abs(d) * 60)} min ggü. Vorperiode`
+        : `${d >= 0 ? "+" : "−"}${fmt(Math.abs(d), Math.abs(d) < 1 ? 1 : 0)} ${unit} ggü. Vorperiode`.replace("  ", " ");
+    }
+    const t = document.createElement("div");
+    t.className = "tile";
+    t.innerHTML = `<div class="label"><span class="mark" style="background:var(--${color})"></span>${label}</div>
+      <div class="val num">${lv ? (key === "sleep" ? hours(lv.v) : fmt(lv.v, dig)) : "–"}<small>${unit}</small></div>
+      <div class="delta ${hl ? "hl" : ""}" title="${hint}">${delta}</div>`;
+    t.appendChild(sparkline(cur, C[color]));
+    host.appendChild(t);
+  }
+}
+
+function sparkline(vals, color) {
+  const W = 240, H = 40;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", height: H, preserveAspectRatio: "none", "aria-hidden": "true" });
+  const v = vals.filter((x) => x != null);
+  if (v.length < 2) return svg;
+  let lo = Math.min(...v), hi = Math.max(...v); if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+  const x = (i) => (i / (vals.length - 1)) * (W - 6) + 3;
+  const y = (val) => H - 4 - ((val - lo) / (hi - lo)) * (H - 8);
+  el("path", { d: pathWithGaps(vals, x, y), fill: "none", stroke: color, "stroke-width": 1.5, "vector-effect": "non-scaling-stroke", class: "draw" }, svg);
+  const l = lastVal(vals);
+  el("rect", { x: x(l.i) - 3, y: y(l.v) - 3, width: 6, height: 6, fill: C.white }, svg);
+  return svg;
+}
+
+function pathWithGaps(vals, x, y) {
+  let d = "", pen = false;
+  vals.forEach((v, i) => {
+    if (v == null) { pen = false; return; }
+    d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+    pen = true;
+  });
+  return d;
+}
+
+// ---------- Allgemeines Zeitreihen-Diagramm
+// type: "line" | "bar" | "range"
+function chart(host, cfg) {
+  host.innerHTML = "";
+  const W = Math.max(280, host.clientWidth), H = cfg.height || 220;
+  // Rechter Rand so breit wie die Beschriftung des letzten Werts, damit sie nie Daten verdeckt
+  const li0 = lastVal(cfg.type === "range" ? cfg.high : cfg.values);
+  const endText = li0 && cfg.endLabel ? cfg.endLabel(li0.i) : "";
+  const m = { t: 14, r: Math.max(40, endText.length * 7.4 + 26), b: 26, l: 36 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const n = cfg.labels.length;
+  const slot = iw / n;
+  const xs = (i) => m.l + slot * i + slot / 2;
+  const vals = cfg.type === "range" ? cfg.high.concat(cfg.low) : cfg.values.slice();
+  if (cfg.band) vals.push(cfg.band[0], cfg.band[1]);
+  if (cfg.ref != null) vals.push(cfg.ref);
+  const v = vals.filter((x) => x != null);
+  let lo = cfg.yMin != null ? cfg.yMin : Math.min(...v), hi = cfg.yMax != null ? cfg.yMax : Math.max(...v);
+  if (!v.length) { lo = 0; hi = 1; }
+  if (cfg.yMin == null) { const pad = (hi - lo) * 0.15 || 2; lo -= pad; hi += pad; }
+  const ticks = niceTicks(lo, hi, 4); lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+  const y = (val) => m.t + ih - ((val - lo) / (hi - lo)) * ih;
+
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": cfg.title });
+  ticks.forEach((t) => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), class: "gridline" }, svg);
+    el("text", { x: m.l - 6, y: y(t) + 4, "text-anchor": "end", class: "axis" }, svg).textContent = fmt(t, cfg.tickDigits || 0);
+  });
+  el("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, class: "baseline" }, svg);
+  const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / 58))));
+  cfg.labels.forEach((lab, i) => {
+    if ((n - 1 - i) % step === 0) el("text", { x: xs(i), y: H - 6, "text-anchor": "middle", class: "axis" }, svg).textContent = cfg.short ? cfg.short(lab) : lab;
+  });
+  if (cfg.band && cfg.band[0] != null) {
+    el("rect", { x: m.l, width: iw, y: y(cfg.band[1]), height: Math.max(0, y(cfg.band[0]) - y(cfg.band[1])), fill: cfg.color, "fill-opacity": 0.12 }, svg);
+    el("line", { x1: m.l, x2: W - m.r, y1: y(cfg.band[2]), y2: y(cfg.band[2]), stroke: cfg.color, "stroke-opacity": 0.45, "stroke-width": 1 }, svg);
+  }
+  if (cfg.ref != null) {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(cfg.ref), y2: y(cfg.ref), class: "ref" }, svg);
+    el("text", { x: W - m.r + 4, y: y(cfg.ref) + 4, class: "ref-label" }, svg).textContent = cfg.refLabel || "";
+  }
+
+  const bw = Math.max(2, Math.min(18, slot * 0.62));
+  let lastIdx = -1, endLabelEl = null;
+  if (cfg.type === "line") {
+    el("path", { d: pathWithGaps(cfg.values, xs, y), fill: "none", stroke: cfg.color, "stroke-width": 2, "stroke-linejoin": "miter", class: "draw" }, svg);
+    // Einzelne Punkte zwischen Lücken sichtbar machen (quadratisch)
+    cfg.values.forEach((val, i) => {
+      if (val == null) return;
+      const iso1 = (cfg.values[i - 1] == null) && (cfg.values[i + 1] == null);
+      if (iso1) el("rect", { x: xs(i) - 3, y: y(val) - 3, width: 6, height: 6, fill: cfg.color }, svg);
+      if (cfg.flag && cfg.flag(val, i)) el("rect", { x: xs(i) - 3, y: y(val) - 3, width: 6, height: 6, fill: "none", stroke: C.white, "stroke-width": 1.5 }, svg);
+    });
+    lastIdx = lastVal(cfg.values)?.i ?? -1;
+  } else if (cfg.type === "bar") {
+    cfg.values.forEach((val, i) => {
+      if (val == null) return;
+      const hl = cfg.highlight && cfg.highlight(val, i);
+      const top = y(Math.max(val, lo)), base = y(Math.max(lo, 0));
+      el("rect", { x: xs(i) - bw / 2, y: Math.min(top, base), width: bw, height: Math.abs(base - top), fill: hl ? C.white : cfg.color, class: "growable" }, svg);
+      if (hl && cfg.hlMarker) el("rect", { x: xs(i) - 3, y: m.t + ih + 3, width: 6, height: 6, fill: C.white }, svg);
+    });
+    lastIdx = lastVal(cfg.values)?.i ?? -1;
+  } else if (cfg.type === "range") {
+    cfg.high.forEach((hv, i) => {
+      const lv = cfg.low[i];
+      if (hv == null || lv == null) return;
+      const hl = cfg.highlight && cfg.highlight(hv, i);
+      el("rect", { x: xs(i) - bw / 2, y: y(hv), width: bw, height: Math.max(2, y(lv) - y(hv)), fill: hl ? C.white : cfg.color, class: "growable" }, svg);
+    });
+    lastIdx = lastVal(cfg.high)?.i ?? -1;
+  }
+
+  // Letzter Wert: weißes Quadrat und direkte Beschriftung
+  if (lastIdx >= 0) {
+    const lv = cfg.type === "range" ? cfg.high[lastIdx] : cfg.values[lastIdx];
+    if (cfg.type === "line") el("rect", { x: xs(lastIdx) - 4, y: y(lv) - 4, width: 8, height: 8, fill: C.white }, svg);
+    const off = cfg.type === "line" ? 8 : bw / 2 + 6; // neben der Säule, nicht darüber
+    const t = el("text", { x: xs(lastIdx) + off, y: y(lv) + 4, class: "endlabel" }, svg);
+    t.textContent = cfg.endLabel ? cfg.endLabel(lastIdx) : fmt(lv, cfg.digits || 0);
+    endLabelEl = t;
+  }
+
+  // Hover-Layer: Fadenkreuz und Tooltip
+  const cross = el("line", { y1: m.t, y2: m.t + ih, class: "cross", visibility: "hidden" }, svg);
+  const crossH = el("line", { x1: m.l, x2: W - m.r, class: "cross", visibility: "hidden" }, svg);
+  const overlay = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" }, svg);
+  host.appendChild(svg);
+  // Beschriftung des letzten Werts nie abschneiden: gemessene Breite, sonst nach links setzen
+  if (endLabelEl) {
+    const w = endLabelEl.getComputedTextLength();
+    if (Number(endLabelEl.getAttribute("x")) + w > W - 2) { endLabelEl.setAttribute("text-anchor", "end"); endLabelEl.setAttribute("x", xs(lastIdx) - 8); endLabelEl.setAttribute("y", Number(endLabelEl.getAttribute("y")) - 10); }
+  }
+  const tip = document.createElement("div"); tip.className = "tip"; tip.setAttribute("role", "status"); host.appendChild(tip);
+  const move = (ev) => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(n - 1, Math.floor((px - m.l) / slot)));
+    const yv = cfg.type === "range" ? cfg.high[i] : cfg.values[i];
+    cross.setAttribute("x1", xs(i)); cross.setAttribute("x2", xs(i)); cross.setAttribute("visibility", "visible");
+    if (yv != null) { crossH.setAttribute("y1", y(yv)); crossH.setAttribute("y2", y(yv)); crossH.setAttribute("visibility", "visible"); } else crossH.setAttribute("visibility", "hidden");
+    tip.innerHTML = cfg.tooltip(i);
+    tip.classList.add("show");
+    const tx = (xs(i) / W) * r.width, tw = tip.offsetWidth;
+    tip.style.left = `${Math.max(0, Math.min(r.width - tw, tx + 12 + tw > r.width ? tx - tw - 12 : tx + 12))}px`;
+    tip.style.top = `${Math.max(0, ((yv != null ? y(yv) : m.t) / H) * r.height - tip.offsetHeight - 10)}px`;
+  };
+  const leave = () => { tip.classList.remove("show"); cross.setAttribute("visibility", "hidden"); crossH.setAttribute("visibility", "hidden"); };
+  overlay.addEventListener("pointermove", move);
+  overlay.addEventListener("pointerdown", move);
+  overlay.addEventListener("pointerleave", leave);
+  return svg;
+}
+
+function niceTicks(lo, hi, count) {
+  const span = hi - lo || 1;
+  const raw = span / count, p = 10 ** Math.floor(Math.log10(raw)), f = raw / p;
+  const st = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+  const out = [];
+  for (let t = Math.floor(lo / st) * st; t <= hi + st * 0.001; t += st) out.push(+t.toFixed(6));
+  return out;
+}
+
+// ---------- Diagramme
+function renderCharts(days) {
+  const hrv = series(days, "hrv");
+  const mu = mean(hrv), s = sd(hrv);
+  $("hrv-sum").textContent = mu != null ? `Ø ${fmt(mu)} ms${s ? `, Band ${fmt(mu - s)}–${fmt(mu + s)} ms` : ""}` : "";
+  chart($("c-hrv"), {
+    title: "HRV pro Nacht", type: "line", labels: days, short: dShort, values: hrv, color: C.blue, height: 260,
+    band: s ? [mu - s, mu + s, mu] : null,
+    flag: (v) => s && (v < mu - s || v > mu + s),
+    endLabel: (i) => `${fmt(hrv[i])} ms`,
+    tooltip: (i) => `<b>${dLong(days[i])}</b><br>HRV ${hrv[i] == null ? "keine Daten" : fmt(hrv[i]) + " ms"}${mu != null && hrv[i] != null ? `<br>${hrv[i] >= mu ? "+" : "−"}${fmt(Math.abs(hrv[i] - mu))} ms zum Ø` : ""}`,
+  });
+  const rhr = series(days, "rhr");
+  chart($("c-rhr"), {
+    title: "Ruhepuls", type: "line", labels: days, short: dShort, values: rhr, color: C.red,
+    endLabel: (i) => `${fmt(rhr[i])} bpm`,
+    tooltip: (i) => `<b>${dLong(days[i])}</b><br>Ruhepuls ${rhr[i] == null ? "keine Daten" : fmt(rhr[i]) + " bpm"}`,
+  });
+  const sl = series(days, "sleep");
+  chart($("c-sleep"), {
+    title: "Schlafdauer", type: "bar", labels: days, short: dShort, values: sl, color: C.yellow, yMin: 0,
+    ref: 7, refLabel: "7 h", highlight: (v) => v < 7, hlMarker: true, tickDigits: 0,
+    endLabel: (i) => `${hours(sl[i])} h`,
+    tooltip: (i) => `<b>${dLong(days[i])}</b><br>Schlaf ${sl[i] == null ? "keine Daten" : hours(sl[i]) + " h"}${METRICS.sleepScore(days[i]) != null ? `<br>Score ${METRICS.sleepScore(days[i])}` : ""}`,
+  });
+  const hi = series(days, "bbHigh"), lo = series(days, "bbLow");
+  chart($("c-bb"), {
+    title: "Body Battery Tagesspanne", type: "range", labels: days, short: dShort, high: hi, low: lo, color: C.green, yMin: 0, yMax: 100,
+    highlight: (v) => v < 50,
+    endLabel: (i) => `${fmt(lo[i])}–${fmt(hi[i])}`,
+    tooltip: (i) => `<b>${dLong(days[i])}</b><br>${hi[i] == null ? "keine Daten" : `Body Battery ${fmt(lo[i])} bis ${fmt(hi[i])}`}`,
+  });
+  // Wochenkilometer
+  const firstMon = monday(parse(days[0]));
+  const weeks = [];
+  for (let d = firstMon; d <= lastDate; d = addDays(d, 7)) weeks.push(iso(d));
+  const kmW = weeks.map((w) => { const s0 = parse(w), e0 = addDays(s0, 6); return workouts.filter((a) => isTrainingKm(a) && a.datum && parse(a.datum) >= s0 && parse(a.datum) <= e0).reduce((s1, a) => s1 + (a.distanz_km || 0), 0); });
+  const ebW = weeks.map((w) => { const s0 = parse(w), e0 = addDays(s0, 6); return workouts.filter((a) => isEbike(a) && a.datum && parse(a.datum) >= s0 && parse(a.datum) <= e0).reduce((s1, a) => s1 + (a.dauer_min || 0), 0); });
+  const curWeek = iso(monday(new Date()));
+  chart($("c-km"), {
+    title: "Wochenkilometer", type: "bar", labels: weeks, short: (w) => `kw ${isoWeek(parse(w)).w}`, values: kmW, color: C.blue, yMin: 0,
+    highlight: (v, i) => weeks[i] === curWeek, digits: 1,
+    endLabel: (i) => `${fmt(kmW[i], 1)} km`,
+    tooltip: (i) => `<b>KW ${isoWeek(parse(weeks[i])).w}</b> (ab ${dShort(weeks[i])})<br>${fmt(kmW[i], 1)} km${weeks[i] === curWeek ? "<br>laufende Woche" : ""}`,
+  });
+  renderEveryday(days, weeks, ebW, curWeek);
+}
+
+function renderEveryday(days, weeks, ebW, curWeek) {
+  const st = series(days, "steps");
+  const avg = mean(st);
+  $("steps-sum").textContent = avg != null ? `Ø ${fmt(avg)} Schritte` : "";
+  chart($("c-steps"), {
+    title: "Schritte pro Tag", type: "bar", labels: days, short: dShort, values: st, color: C.green, yMin: 0,
+    ref: 8000, refLabel: "8.000",
+    endLabel: (i) => fmt(st[i]),
+    tooltip: (i) => `<b>${dLong(days[i])}</b><br>${st[i] == null ? "keine Daten" : fmt(st[i]) + " Schritte"}`,
+  });
+  const avgEb = mean(ebW.slice(0, -1).length ? ebW.slice(0, -1) : ebW);
+  $("ebike-sum").textContent = avgEb != null ? `Ø ${fmt(avgEb)} min pro abgeschlossener Woche` : "";
+  chart($("c-ebike"), {
+    title: "E-Bike-Minuten pro Woche", type: "bar", labels: weeks, short: (w) => `kw ${isoWeek(parse(w)).w}`, values: ebW, color: C.green, yMin: 0,
+    highlight: (v, i) => weeks[i] === curWeek,
+    endLabel: (i) => `${fmt(ebW[i])} min`,
+    tooltip: (i) => `<b>KW ${isoWeek(parse(weeks[i])).w}</b> (ab ${dShort(weeks[i])})<br>${fmt(ebW[i])} min E-Bike (${hours(ebW[i] / 60)} h)${weeks[i] === curWeek ? "<br>laufende Woche" : ""}`,
+  });
+}
+
+function renderLog(days) {
+  const set = new Set(days);
+  const list = workouts.filter((a) => set.has(a.datum)).slice(0, 25);
+  const rows = list.map((a) => `<tr><td class="l">${dShort(a.datum)}</td><td class="l">${esc(a.name)}</td>
+    <td class="num">${a.distanz_km ? fmt(a.distanz_km, 2) + " km" : '<span class="nd">–</span>'}</td>
+    <td class="num">${a.dauer_min != null ? hours(a.dauer_min / 60) : "–"}</td>
+    <td class="num">${pace(a) ? pace(a) + " /km" : '<span class="nd">–</span>'}</td>
+    <td class="num">${a.puls_avg != null ? fmt(a.puls_avg) : "–"}</td>
+    <td class="num">${a.te_aerob != null ? fmt(a.te_aerob, 1) : "–"}</td></tr>`).join("");
+  $("log").innerHTML = `<thead><tr><th class="l">datum</th><th class="l">name</th><th>distanz</th><th>zeit</th><th>pace</th><th>puls ø</th><th>te aerob</th></tr></thead>
+    <tbody>${rows || `<tr><td class="l" colspan="7">Keine Workouts im Zeitraum.</td></tr>`}</tbody>`;
+}
+
+function renderRaw(days) {
+  const cols = [["hrv", "hrv ms"], ["rhr", "ruhepuls"], ["sleep", "schlaf h"], ["sleepScore", "schlafscore"], ["bbLow", "bb tief"], ["bbHigh", "bb hoch"], ["stress", "stress"], ["steps", "schritte"], ["tr", "readiness"]];
+  const cell = (k, v) => v == null ? '<td><span class="nd">–</span></td>' : `<td class="num">${k === "sleep" ? hours(v) : fmt(v)}</td>`;
+  $("raw").innerHTML = `<thead><tr><th class="l">datum</th>${cols.map((c) => `<th>${c[1]}</th>`).join("")}</tr></thead>
+    <tbody>${days.slice().reverse().map((d) => `<tr><td class="l">${dLong(d)}</td>${cols.map(([k]) => cell(k, METRICS[k](d))).join("")}</tr>`).join("")}</tbody>`;
+}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ---------- Animation (nur beim ersten Aufbau)
+function animate() {
+  if (REDUCED) return;
+  document.querySelectorAll("path.draw").forEach((p) => {
+    const len = p.getTotalLength(); // gemessen, nicht geschätzt
+    if (!len) return;
+    p.style.strokeDasharray = `${len} ${len}`;
+    p.style.strokeDashoffset = len;
+    p.getBoundingClientRect();
+    p.style.transition = "stroke-dashoffset 1.1s ease-out";
+    p.style.strokeDashoffset = "0";
+    p.addEventListener("transitionend", () => { p.style.strokeDasharray = "none"; }, { once: true });
+  });
+  document.querySelectorAll("rect.growable").forEach((r) => r.classList.add("grow"));
+}
+
+// ---------- Aufbau
+function render() {
+  const days = period(range);
+  renderHero(days); renderSide(days); renderTiles(days); renderCharts(days); renderLog(days); renderRaw(days);
+  document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.range) === range)));
+  if (firstRender) { animate(); firstRender = false; }
+}
+$("updated").textContent = DATA.aktualisiert ? `aktualisiert ${dLong(DATA.aktualisiert.slice(0, 10))}, ${DATA.aktualisiert.slice(11, 16)} uhr` : "";
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { range = Number(b.dataset.range); render(); }));
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { const f = firstRender; firstRender = false; renderCharts(period(range)); firstRender = f; }, 150); });
+render();
+})();
+</script>
+</body>
+</html>

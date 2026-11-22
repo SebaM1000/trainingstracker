@@ -1,0 +1,21 @@
+# Login-Token (Zugang zum Garmin-Konto) – niemals versionieren
+.garminconnect/
+*token*.json
+
+# Gesundheitsdaten und erzeugte Dateien
+garmin/
+data.json
+dashboard.html
+*.md.bak
+
+# Logs
+logs/
+*.log
+
+# Virtuelle Umgebung und Python-Zwischendateien
+.venv/
+__pycache__/
+*.pyc
+
+# Lokale Einstellungen
+config.json
