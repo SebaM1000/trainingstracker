@@ -119,3 +119,34 @@ export function distBar(dist, targetLow) {
       h('span', { class: 'legend-item' }, h('i', { class: `sw ${k}` }), `${l} ${Math.round((v / total) * 100)} %`))),
     h('p', { class: 'small muted' }, `Ziel: ca. ${Math.round(targetLow * 100)} % locker. Aktuell ${Math.round((dist.low / total) * 100)} %.`));
 }
+
+// Kleine Verlaufslinie für Kennzahl-Kacheln. Lücken bleiben Lücken, Normalband optional,
+// letzter Wert als Quadrat hervorgehoben. Jeder Punkt hat einen Tooltip.
+export function sparkline(points, { color = 'var(--accent)', band = null, height = 44, bars = false, ref = null } = {}) {
+  const W = 160, H = height, pad = 4;
+  const vals = points.map((p) => p.y).filter((v) => v !== null && v !== undefined);
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'spark', preserveAspectRatio: 'none', role: 'img' });
+  if (vals.length < 2) return h('div', { class: 'spark-empty muted small' }, 'zu wenig Daten');
+  let lo = Math.min(...vals, band ? band[0] : Infinity, ref ?? Infinity), hi = Math.max(...vals, band ? band[1] : -Infinity, ref ?? -Infinity);
+  if (bars) lo = 0;
+  if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+  const n = points.length;
+  const x = (i) => pad + (i / Math.max(1, n - 1)) * (W - 2 * pad);
+  const y = (v) => H - pad - ((v - lo) / (hi - lo)) * (H - 2 * pad);
+  if (band) svg.append(s('rect', { x: 0, width: W, y: y(band[1]), height: Math.max(1, y(band[0]) - y(band[1])), class: 'spark-band' }));
+  if (ref !== null) svg.append(s('line', { x1: 0, x2: W, y1: y(ref), y2: y(ref), class: 'spark-ref' }));
+  if (bars) {
+    const bw = Math.max(2, (W - 2 * pad) / n * 0.6);
+    points.forEach((p, i) => { if (p.y !== null && p.y !== undefined) svg.append(s('rect', { x: x(i) - bw / 2, y: y(p.y), width: bw, height: Math.max(1, y(lo) - y(p.y)), fill: color, opacity: i === n - 1 ? 1 : 0.75 })); });
+  } else {
+    let d = '', pen = false;
+    points.forEach((p, i) => { if (p.y === null || p.y === undefined) { pen = false; return; } d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.y).toFixed(1)}`; pen = true; });
+    svg.append(s('path', { d, fill: 'none', stroke: color, 'stroke-width': 1.8, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' }));
+  }
+  let li = -1; points.forEach((p, i) => { if (p.y !== null && p.y !== undefined) li = i; });
+  if (li >= 0 && !bars) svg.append(s('rect', { x: x(li) - 3, y: y(points[li].y) - 3, width: 6, height: 6, class: 'spark-last' }));
+  points.forEach((p, i) => svg.append(s('rect', { x: x(i) - (W / n) / 2, y: 0, width: W / n, height: H, fill: 'transparent', 'data-tip': p.tip })));
+  const wrap = h('div', { class: 'chart-wrap' }, svg);
+  withTooltip(svg, wrap);
+  return wrap;
+}

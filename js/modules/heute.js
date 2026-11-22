@@ -8,7 +8,47 @@ import { GOALS } from '../science/goals.js';
 import { SPORTS } from '../science/endurance.js';
 import { REFS } from '../science/references.js';
 import { assess, advice, LEVELS } from '../science/readiness.js';
-import { ymd } from '../core/dates.js';
+import { ymd, addDays } from '../core/dates.js';
+import { sparkline } from '../core/charts.js';
+
+// Kleines Erholungs-Dashboard: die letzten 14 Tage aus den Garmin-Tageswerten
+const METRICS = [
+  { key: 'readiness', label: 'Readiness', unit: '', color: 'var(--m-green)', hint: 'Garmins Bereitschaft 0–100' },
+  { key: 'hrv', label: 'HRV', unit: 'ms', color: 'var(--m-blue)', band: true, hint: 'höher ist meist besser' },
+  { key: 'rhr', label: 'Ruhepuls', unit: 'bpm', color: 'var(--m-red)', band: true, hint: 'niedriger ist meist besser' },
+  { key: 'sleepH', label: 'Schlaf', unit: 'h', color: 'var(--m-yellow)', bars: true, ref: 7, hint: 'Linie = 7 h' },
+  { key: 'bbHigh', label: 'Body Battery', unit: 'max', color: 'var(--m-green)', bars: true, hint: 'Höchstwert des Tages' },
+];
+const fmtVal = (k, v) => (v === null || v === undefined ? '–' : k === 'sleepH' ? `${Math.floor(v)}:${String(Math.round((v % 1) * 60)).padStart(2, '0')}` : String(Math.round(v)));
+
+function erholungCard(ctx) {
+  const p = ctx.profile;
+  const well = p.wellness || {};
+  const days = Object.keys(well).sort();
+  if (!days.length) return null;
+  const end = new Date(days[days.length - 1]);
+  const range = Array.from({ length: 14 }, (_, i) => ymd(addDays(end, i - 13)));
+  const grid = h('div', { class: 'mini-grid' });
+  for (const m of METRICS) {
+    const pts = range.map((d) => ({ y: well[d]?.[m.key] ?? null, tip: `${fmtDate(d, false)}: ${fmtVal(m.key, well[d]?.[m.key])} ${m.unit}` }));
+    const vals = pts.map((x) => x.y).filter((v) => v !== null);
+    const last = [...pts].reverse().find((x) => x.y !== null);
+    let band = null;
+    if (m.band && vals.length >= 5) {
+      const mu = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mu) ** 2, 0) / (vals.length - 1));
+      band = [mu - sd, mu + sd];
+    }
+    grid.append(h('div', { class: 'mini' },
+      h('div', { class: 'mini-label' }, h('i', { class: 'mini-mark', style: { background: m.color } }), m.label),
+      h('div', { class: 'mini-val' }, last ? fmtVal(m.key, last.y) : '–', h('small', {}, ` ${m.unit}`)),
+      sparkline(pts, { color: m.color, band, bars: m.bars, ref: m.ref ?? null }),
+      h('div', { class: 'mini-hint' }, band ? 'Band = dein Normalbereich' : m.hint)));
+  }
+  return card('Erholung (14 Tage)', grid,
+    h('p', { class: 'muted small' }, `Stand: ${fmtDate(days[days.length - 1])}. Tippe auf einen Verlauf für den Tageswert. Neue Werte holst du über den Garmin-Import.`),
+    h('button', { class: 'btn ghost small', onclick: () => ctx.go('garmin') }, 'Garmin-Daten aktualisieren'));
+}
 
 function tagesformCard(ctx) {
   const p = ctx.profile;
@@ -19,6 +59,7 @@ function tagesformCard(ctx) {
     h('div', { class: `tf-head tf-${r.level}` }, badge(L.status, L.label)),
     r.date ? h('p', { class: 'muted small' }, r.manual ? 'Von dir für heute selbst eingestuft.' : `Garmin-Werte vom ${fmtDate(r.date)}${r.stale ? ' (veraltet, bitte aktuelle data.json importieren)' : ''}.`) : null,
     r.signals.length ? h('ul', { class: 'hints' }, r.signals.map((x) => h('li', {}, badge(x.points === 0 ? 'good' : x.points === 1 ? 'warning' : 'serious', ''), h('span', {}, x.text)))) : h('p', { class: 'small' }, r.reason || ''),
+    !r.date || r.stale ? h('button', { class: 'btn primary full', onclick: () => ctx.go('garmin') }, 'Garmin-Daten importieren') : null,
     h('div', { class: 'tf-advice' }, advice(r.level).map((t) => h('p', { class: 'small' }, t))),
     h('details', { class: 'details' }, h('summary', {}, 'Ich fühle mich anders'),
       h('p', { class: 'muted small' }, 'Dein eigenes Gefühl zählt: Subjektive Angaben spiegeln die Belastung oft besser als Messwerte. Hier kannst du die Einstufung für heute überschreiben.'),
@@ -44,7 +85,7 @@ export default {
       h('h1', {}, `Hallo ${p.name}`),
       h('span', { class: 'goal-chip' }, `Ziel: ${GOALS[p.goal].label}`)));
 
-    if (m.tagesform !== false) root.append(tagesformCard(ctx));
+    if (m.tagesform !== false) { root.append(tagesformCard(ctx)); const ec = erholungCard(ctx); if (ec) root.append(ec); }
 
     const actions = h('div', { class: 'quick' });
     if (m.kraft !== false) actions.append(h('button', { class: 'btn primary', onclick: () => ctx.go('kraft') },
