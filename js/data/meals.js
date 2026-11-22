@@ -13,8 +13,8 @@ export const STANDARD_BREAKFAST_ITEMS = [
   { name: 'Haferflocken 100 g', kcal: 370, p: 13.5, c: 58.7, f: 7.0 },
   { name: 'Magerquark 250 g', kcal: 168, p: 30.0, c: 10.0, f: 0.5 },
   { name: 'Fettarmer Joghurt 1,5 % 250 g', kcal: 120, p: 10.0, c: 12.0, f: 3.8 },
-  { name: 'Eiweißpulver 1 Scoop (30 g)', kcal: 115, p: 23.0, c: 2.0, f: 1.5 },
-  { name: 'Honig 1 EL (20 g)', kcal: 61, p: 0, c: 15.0, f: 0 },
+  { name: 'Eiweißpulver 1 Scoop (ca. 23 g Eiweiß)', kcal: 115, p: 23.0, c: 2.0, f: 1.5 },
+  { name: 'Honig 1 EL (25 g)', kcal: 76, p: 0, c: 19.0, f: 0 },
   { name: 'TK-Beeren 1 Handvoll (80 g)', kcal: 35, p: 0.8, c: 6.0, f: 0.3 },
 ];
 
@@ -38,3 +38,7 @@ export const DEFAULT_PRESETS = [
 ];
 
 export const CATS = { fruehstueck: 'Frühstück', snack: 'Zwischenmahlzeiten', gericht: 'Gerichte', dessert: 'Desserts' };
+
+// Versionsstand der Vorlagen. Bei Änderungen am Standard-Frühstück hochzählen; ein noch
+// unverändertes Frühstück im Profil wird dann automatisch angepasst.
+export const PRESETS_VERSION = 2;

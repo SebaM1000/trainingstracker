@@ -3,7 +3,7 @@ import { h, card, field, numInput, select, sheet, confirmSheet, toast, badge, fm
 import { ymd, addDays, parseYmd, fmtDate } from '../core/dates.js';
 import { uid } from '../core/store.js';
 import { SPORTS } from '../science/endurance.js';
-import { DEFAULT_PRESETS, CATS } from '../data/meals.js';
+import { DEFAULT_PRESETS, CATS, PRESETS_VERSION } from '../data/meals.js';
 import { bmr, dayNeed, targets, sumDay, balance, settings, kcalFromMacros, scaleFood, sessionKcal, DEFAULT_SETTINGS } from '../science/nutrition.js';
 
 const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a3 3 0 006 0V3M10 3v18"/><path d="M17 3c-2 2-2 6 0 8v10"/></svg>';
@@ -14,7 +14,14 @@ function ensure(p) {
   p.nutrition.foods = p.nutrition.foods || [];
   p.nutrition.days = p.nutrition.days || {};
   p.nutrition.settings = { ...DEFAULT_SETTINGS, ...(p.nutrition.settings || {}) };
-  if (!p.nutrition.presets) p.nutrition.presets = DEFAULT_PRESETS.map((x) => ({ id: uid(), ...x }));
+  if (!p.nutrition.presets) { p.nutrition.presets = DEFAULT_PRESETS.map((x) => ({ id: uid(), ...x })); p.nutrition.presetsVersion = PRESETS_VERSION; }
+  if ((p.nutrition.presetsVersion || 1) < PRESETS_VERSION) {
+    // Standard-Frühstück auf die neuen Werte bringen, solange es nicht von Hand geändert wurde (alter Wert 869 kcal)
+    const std = p.nutrition.presets.find((x) => x.key === 'std-fruehstueck');
+    const neu = DEFAULT_PRESETS.find((x) => x.key === 'std-fruehstueck');
+    if (std && std.kcal === 869) Object.assign(std, { kcal: neu.kcal, p: neu.p, c: neu.c, f: neu.f, note: neu.note });
+    p.nutrition.presetsVersion = PRESETS_VERSION;
+  }
   return p.nutrition;
 }
 
@@ -292,7 +299,7 @@ export function ernaehrungCard(ctx) {
 
 function render(root, ctx) {
   const p = ctx.profile;
-  if (!p.nutrition || !p.nutrition.presets) ctx.store.updateProfile((x) => ensure(x));
+  if (!p.nutrition || !p.nutrition.presets || (p.nutrition.presetsVersion || 1) < PRESETS_VERSION) ctx.store.updateProfile((x) => ensure(x));
   ensure(p);
   const today = ymd();
   let date = sessionStorageGet() || today;
