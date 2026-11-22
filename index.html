@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Trainingstracker</title>
+  <meta name="theme-color" content="#121211">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Training">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="header-title" class="topbar-title">Trainingstracker</h1>
+    <button id="profile-chip" class="profile-chip" type="button">?</button>
+  </header>
+  <div id="storage-warning" class="storage-warning" hidden>
+    Speichern ist in dieser Umgebung nicht möglich. Daten gehen beim Schließen verloren – bitte Backup nutzen.
+  </div>
+  <main id="main" class="main"></main>
+  <nav id="nav" class="tabbar" aria-label="Hauptnavigation"></nav>
+  <noscript>Diese App benötigt JavaScript.</noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
