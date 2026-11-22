@@ -132,7 +132,8 @@ textarea { resize: vertical; }
 input[type=number] { font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
 input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .abend-row { display: flex; flex-direction: column; gap: 8px; }
-.abend-row input[type=time] { max-width: 160px; }
+.abend-row input { max-width: 160px; font-variant-numeric: tabular-nums; }
+.abend-row input.invalid { border-color: var(--critical); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 10px; }
 .grid5 input { padding: 10px 6px; text-align: center; }

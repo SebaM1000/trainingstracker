@@ -10,6 +10,21 @@ export function defaultEvening(now = new Date()) {
   return ymd(now.getHours() < 12 ? addDays(now, -1) : now);
 }
 
+// Uhrzeit aus Tipp-Eingabe lesen: "1930", "19:30", "19.30", "930", "7" -> "HH:MM", sonst null
+export function parseTime(raw) {
+  const t = String(raw || '').trim();
+  let hh; let mm;
+  const sep = t.match(/^(\d{1,2})\s*[:.,h ]\s*(\d{1,2})$/);
+  if (sep) { hh = +sep[1]; mm = +sep[2]; }
+  else if (/^\d{1,4}$/.test(t)) {
+    if (t.length <= 2) { hh = +t; mm = 0; }
+    else { hh = +t.slice(0, t.length - 2); mm = +t.slice(-2); }
+  } else return null;
+  if (hh === 24 && mm === 0) hh = 0;
+  if (hh > 23 || mm > 59) return null;
+  return `${pad(hh)}:${pad(mm)}`;
+}
+
 const nowHM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const blank = () => ({ hardEnd: '', noHard: false, coffee: '', noCoffee: false, alcohol: null, bed: '' });
 
@@ -43,17 +58,40 @@ function form(ctx, date, onSaved) {
   const wrap = h('div', { class: 'form' });
 
   const timeRow = (label, key, noKey, noLabel, chips = []) => {
-    const input = h('input', { type: 'time', value: st[key], 'aria-label': label,
-      oninput: (e) => { st[key] = e.target.value; if (noKey) st[noKey] = false; draw(); } });
-    const chipEls = chips.map((c) => h('button', { type: 'button', class: `chip ${st[key] === c.value && !st[noKey] ? 'active' : ''}`,
-      onclick: () => { st[key] = c.value === 'jetzt' ? nowHM() : c.value; if (noKey) st[noKey] = false; draw(); } }, c.label));
-    if (noKey) chipEls.push(h('button', { type: 'button', class: `chip ${st[noKey] ? 'active' : ''}`,
-      onclick: () => { st[noKey] = !st[noKey]; if (st[noKey]) st[key] = ''; draw(); } }, noLabel));
+    const chipEls = [];
+    const refresh = () => {
+      chipEls.forEach((el) => el.classList.toggle('active',
+        el.dataset.no ? !!st[noKey] : !st[noKey] && st[key] === el.dataset.value));
+      input.classList.toggle('invalid', input.value !== '' && !parseTime(input.value));
+    };
+    // Eintippen statt Drehrad: 1930, 19:30, 19.30 oder 7 werden zu 19:30 bzw. 07:00
+    const input = h('input', { type: 'text', inputmode: 'numeric', value: st[key], placeholder: 'z. B. 1930',
+      autocomplete: 'off', 'aria-label': label,
+      oninput: (e) => { st[key] = e.target.value; if (noKey && e.target.value) st[noKey] = false; refresh(); },
+      onchange: (e) => { const t = parseTime(e.target.value); if (t) { st[key] = t; e.target.value = t; } refresh(); } });
+    for (const c of chips) {
+      const el = h('button', { type: 'button', class: 'chip',
+        onclick: () => { const v = c.value === 'jetzt' ? nowHM() : c.value; st[key] = v; input.value = v; if (noKey) st[noKey] = false; refresh(); } }, c.label);
+      el.dataset.value = c.value;
+      chipEls.push(el);
+    }
+    if (noKey) {
+      const el = h('button', { type: 'button', class: 'chip',
+        onclick: () => { st[noKey] = !st[noKey]; if (st[noKey]) { st[key] = ''; input.value = ''; } refresh(); } }, noLabel);
+      el.dataset.no = '1';
+      chipEls.push(el);
+    }
+    refresh();
     return h('div', { class: 'field' }, h('span', { class: 'field-label' }, label),
       h('div', { class: 'abend-row' }, input, h('div', { class: 'chips wrap' }, chipEls)));
   };
 
   const save = () => {
+    for (const k of ['hardEnd', 'coffee', 'bed']) if (st[k]) {
+      const t = parseTime(st[k]);
+      if (!t) { toast(`Uhrzeit „${st[k]}“ verstehe ich nicht, bitte z. B. 1930 eingeben.`); return; }
+      st[k] = t;
+    }
     const entry = {
       hardEnd: st.noHard ? null : st.hardEnd,
       coffee: st.noCoffee ? null : st.coffee,
