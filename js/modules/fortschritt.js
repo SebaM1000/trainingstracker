@@ -65,8 +65,8 @@ export default {
       if (used.length) {
         if (!used.includes(chosenEx)) chosenEx = used[0];
         const hist = historyFor(p, chosenEx);
-        const pts = hist.map((x) => ({ label: fmtDate(x.date, false).slice(0, 5), y: sessionBestE1rm(x.ex),
-          tip: `${fmtDate(x.date, false)}: e1RM ${fmt(sessionBestE1rm(x.ex), 1)} kg` })).filter((x) => x.y);
+        const pts = hist.map((x) => ({ label: fmtDate(x.date, false).slice(0, 5), y: sessionBestE1rm(x.ex, p),
+          tip: `${fmtDate(x.date, false)}: e1RM ${fmt(sessionBestE1rm(x.ex, p), 1)} kg` })).filter((x) => x.y);
         const best = Math.max(...pts.map((x) => x.y));
         root.append(card('Kraftentwicklung (e1RM)',
           select(Object.fromEntries(used.map((id) => [id, exerciseById(p, id)?.name || id])), chosenEx, (v) => { chosenEx = v; ctx.rerender(); }, 'Übung wählen'),

@@ -4,7 +4,7 @@ import { ICONS } from '../core/icons.js';
 import { uid } from '../core/store.js';
 import { ymd, fmtDate } from '../core/dates.js';
 import { allExercises, exerciseById, MUSCLES } from '../data/exercises.js';
-import { suggestNext, historyFor, doneSets, sessionBestE1rm, tonnage, loadOptions } from '../science/strength.js';
+import { suggestNext, historyFor, doneSets, sessionBestE1rm, tonnage, loadOptions, fmtLoad, bodyweight } from '../science/strength.js';
 import { sessionLoad } from '../science/load.js';
 import { absorbLoadOnly } from '../science/garmin.js';
 import { assess, adjustSuggestion, LEVELS } from '../science/readiness.js';
@@ -102,6 +102,7 @@ function customExercise(ctx, onPick) {
     field('Name', h('input', { type: 'text', oninput: (e) => { ex.name = e.target.value; } })),
     field('Art', h('select', { onchange: (e) => { ex.cat = e.target.value; } },
       h('option', { value: 'compound' }, 'Grundübung (mehrgelenkig)'), h('option', { value: 'isolation' }, 'Isolationsübung'))),
+    h('label', { class: 'switch-row' }, h('span', {}, 'Körpergewichtsübung (Feld = Zusatzgewicht)'), h('input', { type: 'checkbox', onchange: (e2) => { if (e2.target.checked) ex.bw = 1; else delete ex.bw; } })),
     h('p', { class: 'field-label' }, 'Primäre Muskeln (zählen voll)'), muscleChips('p'),
     h('p', { class: 'field-label' }, 'Sekundäre Muskeln (zählen halb)'), muscleChips('s')), [
     { label: 'Abbrechen' },
@@ -140,12 +141,12 @@ function renderDraft(root, ctx) {
     const last = hist[hist.length - 1];
     const rest = def.cat === 'compound' ? p.params.restCompound : p.params.restIsolation;
     const rows = h('div', { class: 'sets' },
-      h('div', { class: 'set-row set-head' }, h('span', {}, 'Satz'), h('span', {}, 'kg'), h('span', {}, 'Wdh.'), h('span', {}, 'RIR'), h('span', {}, '')));
+      h('div', { class: 'set-row set-head' }, h('span', {}, 'Satz'), h('span', { title: def.bw ? 'Zusatzgewicht zum Körpergewicht, minus = Unterstützung' : '' }, def.bw ? '+kg' : 'kg'), h('span', {}, 'Wdh.'), h('span', {}, 'RIR'), h('span', {}, '')));
     ex.sets.forEach((st, si) => {
       const row = h('div', { class: `set-row ${st.done ? 'done' : ''}` },
         h('button', { class: 'set-no', 'aria-label': `Satz ${si + 1} löschen`, onclick: () => {
           save((x) => x.exercises[ei].sets.splice(si, 1)); ctx.rerender(); } }, String(si + 1)),
-        numInput(st.w, (v) => save((x) => { x.exercises[ei].sets[si].w = v; }), { decimal: true, label: 'Gewicht in kg', step: 0.5 }),
+        numInput(st.w, (v) => save((x) => { x.exercises[ei].sets[si].w = v; }), { decimal: true, label: def.bw ? 'Zusatzgewicht in kg' : 'Gewicht in kg', step: 0.5, placeholder: def.bw ? '0' : '' }),
         numInput(st.reps, (v) => save((x) => { x.exercises[ei].sets[si].reps = v; }), { label: 'Wiederholungen', step: 1 }),
         numInput(st.rir, (v) => save((x) => { x.exercises[ei].sets[si].rir = v; }), { label: 'Wiederholungen in Reserve', step: 1, min: 0, max: 10 }),
         h('button', { class: `check ${st.done ? 'on' : ''}`, 'aria-pressed': String(!!st.done), 'aria-label': 'Satz erledigt', onclick: () => {
@@ -162,9 +163,10 @@ function renderDraft(root, ctx) {
           h('div', { class: 'muted small' }, def.p.map((m) => MUSCLES[m]).join(', '))),
         h('button', { class: 'icon-btn', 'aria-label': 'Übungsoptionen', onclick: () => exMenu(ctx, ei) }, '⋯')),
       h('div', { class: `hint ${sug.kind}` }, sug.text),
+      def.bw ? h('div', { class: 'muted small' }, bodyweight(p) ? `Rechnet mit ${String(bodyweight(p)).replace('.', ',')} kg Körpergewicht (Profil).` : 'Körpergewicht fehlt im Profil, gerechnet wird vorerst mit 75 kg.') : null,
       sug.loads ? h('div', { class: 'muted small' }, `Stufen: ${sug.loads.slice(0, 8).map((x) => String(x).replace('.', ',')).join(' – ')} kg`) : null,
       last ? h('div', { class: 'muted small' }, `Zuletzt (${fmtDate(last.date, false)}): `,
-        doneSets(last.ex).map((s) => `${fmt(s.w, s.w % 1 ? 1 : 0)}×${s.reps}${s.rir !== '' && s.rir !== undefined ? ` @${s.rir}` : ''}`).join(', ')) : null,
+        doneSets(last.ex).map((s) => `${def.bw ? fmtLoad(def, s.w).replace(' Unterstützung', '') : fmt(s.w, s.w % 1 ? 1 : 0)}×${s.reps}${s.rir !== '' && s.rir !== undefined ? ` @${s.rir}` : ''}`).join(', ')) : null,
       rows,
       h('button', { class: 'btn ghost small', onclick: () => {
         save((x) => { const s = x.exercises[ei].sets; s.push(newSetFrom(sug, s[s.length - 1])); }); ctx.rerender(); } }, '+ Satz')));
@@ -327,8 +329,8 @@ function sessionDetail(ctx, s) {
     s.loadOnly ? h('p', { class: 'small muted' }, 'Nur von der Uhr, ohne Sätze. Sobald du für diesen Tag ein Training in der App speicherst, werden beide zusammengeführt.') : null,
     s.exercises.map((ex) => h('div', { class: 'detail-ex' },
       h('strong', {}, exerciseById(p, ex.exId)?.name || ex.exId),
-      h('div', { class: 'small' }, ex.sets.map((st) => `${fmt(st.w, st.w % 1 ? 1 : 0)} kg × ${st.reps}${st.rir !== '' && st.rir !== undefined ? ` (RIR ${st.rir})` : ''}`).join(' | ')),
-      h('div', { class: 'muted small' }, `e1RM ${fmt(sessionBestE1rm(ex), 1)} kg`))),
+      h('div', { class: 'small' }, ex.sets.map((st) => `${fmtLoad(exerciseById(p, ex.exId), st.w)} × ${st.reps}${st.rir !== '' && st.rir !== undefined ? ` (RIR ${st.rir})` : ''}`).join(' | ')),
+      h('div', { class: 'muted small' }, `e1RM ${fmt(sessionBestE1rm(ex, p), 1)} kg${exerciseById(p, ex.exId)?.bw ? ' (inkl. Körpergewicht)' : ''}`))),
     s.notes ? h('p', { class: 'small' }, s.notes) : null), [
     { label: 'Löschen', kind: 'danger-ghost', onClick: () => { confirmSheet('Einheit löschen?', 'Das lässt sich nicht rückgängig machen.', 'Löschen', () => {
       ctx.store.updateProfile((pp) => { pp.sessions = pp.sessions.filter((x) => x.id !== s.id); }); ctx.rerender(); }); } },

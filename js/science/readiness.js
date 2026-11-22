@@ -127,13 +127,13 @@ export function adjustSuggestion(sug, level) {
   if (level === 'gelb') {
     if (s.kind === 'up') { s.weight = sug.prevWeight ?? Math.max(0, (s.weight || 0) - (s.inc || 0)); s.reps = sug.prevReps ?? s.reps; s.kind = 'reps'; }
     if (s.rir !== null && s.rir !== undefined) s.rir += 1;
-    s.text = `Tagesform gelb: Gewicht halten${s.weight ? ` (${String(s.weight).replace('.', ',')} kg × ${s.reps})` : ''}, 1 RIR mehr Reserve, ein Satz weniger. Ohne Anpassung wäre es: ${sug.text}`;
+    s.text = `Tagesform gelb: Gewicht halten${s.bw ? ` (${s.weight > 0 ? `KG + ${String(s.weight).replace('.', ',')} kg` : 'Körpergewicht'} × ${s.reps})` : s.weight ? ` (${String(s.weight).replace('.', ',')} kg × ${s.reps})` : ''}, 1 RIR mehr Reserve, ein Satz weniger. Ohne Anpassung wäre es: ${sug.text}`;
     s.setsDelta = -1;
   } else if (level === 'rot') {
-    if (s.weight) { const t = s.weight * 0.85; s.weight = s.loads ? s.loads.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a), s.loads[0]) : Math.round(t / (s.inc || 1)) * (s.inc || 1); }
+    if (s.bw) { s.weight = Math.min(0, s.weight || 0); } else if (s.weight) { const t = s.weight * 0.85; s.weight = s.loads ? s.loads.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a), s.loads[0]) : Math.round(t / (s.inc || 1)) * (s.inc || 1); }
     if (s.rir !== null && s.rir !== undefined) s.rir += 2;
     s.kind = 'down';
-    s.text = `Tagesform rot: Heute besser Erholung. Falls doch: ca. 85 % Gewicht${s.weight ? ` (${String(s.weight).replace('.', ',')} kg)` : ''}, weit weg vom Versagen, halbes Volumen.`;
+    s.text = `Tagesform rot: Heute besser Erholung. Falls doch: ${s.bw ? 'ohne Zusatzgewicht' : `ca. 85 % Gewicht${s.weight ? ` (${String(s.weight).replace('.', ',')} kg)` : ''}`}, weit weg vom Versagen, halbes Volumen.`;
     s.setsDelta = -99; // halbiert, siehe Aufrufer
   }
   return s;

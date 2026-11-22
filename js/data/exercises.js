@@ -18,14 +18,15 @@ export const MUSCLES = {
   unterer_ruecken: 'Unterer Rücken',
 };
 
-const e = (id, name, cat, p, s = [], equip = '') => ({ id, name, cat, p, s, equip });
+// bw = Anteil des Körpergewichts, der bewegt wird (nur bei Körpergewichtsübungen)
+const e = (id, name, cat, p, s = [], equip = '', bw = 0) => ({ id, name, cat, p, s, equip, ...(bw ? { bw } : {}) });
 
 export const EXERCISES = [
   // Push
   e('bankdruecken', 'Bankdrücken (LH)', 'compound', ['brust'], ['trizeps', 'schulter_vorn'], 'Langhantel'),
   e('schraegbank_kh', 'Schrägbankdrücken (KH)', 'compound', ['brust', 'schulter_vorn'], ['trizeps'], 'Kurzhantel'),
-  e('dips', 'Dips', 'compound', ['brust', 'trizeps'], ['schulter_vorn'], 'Körpergewicht'),
-  e('liegestuetz', 'Liegestütz', 'compound', ['brust'], ['trizeps', 'schulter_vorn'], 'Körpergewicht'),
+  e('dips', 'Dips', 'compound', ['brust', 'trizeps'], ['schulter_vorn'], 'Körpergewicht', 1),
+  e('liegestuetz', 'Liegestütz', 'compound', ['brust'], ['trizeps', 'schulter_vorn'], 'Körpergewicht', 0.64),
   e('brustpresse', 'Brustpresse (Maschine)', 'compound', ['brust'], ['trizeps', 'schulter_vorn'], 'Maschine'),
   e('kabelzug_fly', 'Fliegende am Kabel', 'isolation', ['brust'], [], 'Kabel'),
   e('schulterdruecken', 'Schulterdrücken (KH)', 'compound', ['schulter_vorn'], ['trizeps', 'schulter_seite'], 'Kurzhantel'),
@@ -34,7 +35,8 @@ export const EXERCISES = [
   e('trizeps_kabel', 'Trizepsdrücken am Kabel', 'isolation', ['trizeps'], [], 'Kabel'),
   e('trizeps_ueberkopf', 'Trizeps Überkopf', 'isolation', ['trizeps'], [], 'Kabel'),
   // Pull
-  e('klimmzug', 'Klimmzug', 'compound', ['lat'], ['bizeps', 'ruecken_oben'], 'Körpergewicht'),
+  e('klimmzug', 'Klimmzug', 'compound', ['lat'], ['bizeps', 'ruecken_oben'], 'Körpergewicht', 1),
+  e('chinup', 'Klimmzug Untergriff (Chin-up)', 'compound', ['lat', 'bizeps'], ['ruecken_oben'], 'Körpergewicht', 1),
   e('latzug', 'Latzug', 'compound', ['lat'], ['bizeps', 'ruecken_oben'], 'Kabel'),
   e('rudern_lh', 'Rudern vorgebeugt (LH)', 'compound', ['ruecken_oben', 'lat'], ['bizeps', 'schulter_hinten', 'unterer_ruecken'], 'Langhantel'),
   e('rudern_kabel', 'Rudern am Kabel', 'compound', ['ruecken_oben', 'lat'], ['bizeps', 'schulter_hinten'], 'Kabel'),

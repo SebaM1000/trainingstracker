@@ -23,10 +23,33 @@ export const roundTo = (v, inc) => Math.round(v / inc) * inc;
 
 export const doneSets = (ex) => (ex.sets || []).filter((s) => s.done && num(s.reps));
 
-export function sessionBestE1rm(ex) {
+// Körpergewichtsübungen: Eingetragen wird nur das Zusatzgewicht (negativ = Unterstützung, z. B. Band
+// oder Gegengewicht). Für e1RM und Progression zählt die effektive Last = Körpergewicht × Anteil + Zusatz.
+// Anteile (grobe Literaturwerte): Klimmzug und Dips ≈ 100 %, Liegestütz ≈ 64 % des Körpergewichts.
+export const BW_FALLBACK = 75;
+export function bodyweight(profile) {
+  const w = num(profile && profile.body && profile.body.weightKg);
+  return w || null;
+}
+export function effectiveLoad(profile, def, w) {
+  const add = num(w) || 0;
+  if (!def || !def.bw) return num(w);
+  return (bodyweight(profile) || BW_FALLBACK) * def.bw + add;
+}
+export function fmtLoad(def, w) {
+  const v = num(w) || 0;
+  if (!def || !def.bw) return `${kg(v)} kg`;
+  if (v > 0) return `KG + ${kg(v)} kg`;
+  if (v < 0) return `KG − ${kg(-v)} kg Unterstützung`;
+  return 'Körpergewicht';
+}
+
+export function sessionBestE1rm(ex, profile = null) {
+  const def = profile ? exerciseById(profile, ex.exId) : null;
   let best = null;
-  for (const s of doneSets(ex)) {
-    const v = e1rm(s.w, s.reps, s.rir);
+  for (const st of doneSets(ex)) {
+    const load = def && def.bw ? effectiveLoad(profile, def, st.w) : st.w;
+    const v = e1rm(load, st.reps, st.rir);
     if (v && (!best || v > best)) best = v;
   }
   return best;
@@ -55,6 +78,7 @@ export function suggestNext(profile, exId) {
     ? Number(profile.settings.increments.compound) || 2.5
     : Number(profile.settings.increments.isolation) || 1;
   const hist = historyFor(profile, exId);
+  if (ex && ex.bw) return suggestBodyweight(profile, ex, hist);
   const opts = loadOptions(profile, exId);
   const up = (w) => (opts ? snapUp(opts, w) : roundTo(w + inc, inc));
   const down = (w) => (opts ? snapDown(opts, w) : Math.max(0, roundTo(w - inc, inc)));
@@ -74,7 +98,7 @@ export function suggestNext(profile, exId) {
   const reps = work.map((s) => num(s.reps));
   const rirs = work.map((s) => (num(s.rir) === null ? rirTarget : num(s.rir)));
   const avgRir = rirs.reduce((a, b) => a + b, 0) / rirs.length;
-  const best = sessionBestE1rm(last);
+  const best = sessionBestE1rm(last, profile);
   const repMid = Math.round((p.repMin + p.repMax) / 2);
 
   if (avgRir > p.rirMax + 1 && best) {
@@ -111,6 +135,50 @@ export function suggestNext(profile, exId) {
   const target = Math.min(p.repMax, Math.max(...reps) + 1);
   return { kind: 'reps', weight: w, reps: target, rir: rirTarget, inc, loads: opts,
     text: `Gewicht halten (${kg(w)} kg), Ziel ${target} Wdh. pro Satz bei ca. ${rirTarget} RIR.` };
+}
+
+// Progression für Körpergewichtsübungen. Gerechnet wird mit der effektiven Last, vorgeschlagen
+// wird das Zusatzgewicht. Weil 2,5 kg bei Körpergewicht ein kleiner Sprung sind, wird die neue
+// Wiederholungszahl über das geschätzte 1RM bestimmt statt pauschal ans untere Ende zu springen.
+function suggestBodyweight(profile, ex, hist) {
+  const p = profile.params;
+  const inc = Number(profile.settings.increments.compound) || 2.5;
+  const opts = loadOptions(profile, ex.id);
+  const rirTarget = Math.round((p.rirMin + p.rirMax) / 2);
+  const bwKnown = !!bodyweight(profile);
+  const note = bwKnown ? '' : ' (Tipp: Körpergewicht im Profil eintragen, dann wird genauer gerechnet.)';
+  const base = (bodyweight(profile) || BW_FALLBACK) * ex.bw;
+  const repsAt = (e1, add) => Math.round(e1 / (base + add) * 30 - 30 - rirTarget);
+  if (!hist.length) {
+    return { kind: 'start', weight: 0, reps: p.repMax, rir: p.rirMax, inc, bw: true,
+      text: `Erste Einheit mit Körpergewicht. Trag im Feld „+kg“ nur Zusatzgewicht ein (Gürtel, Weste), bei Unterstützung (Band, Gegengewicht) einen Minuswert.${note}` };
+  }
+  const sets = doneSets(hist[hist.length - 1].ex);
+  const adds = sets.map((st) => num(st.w) || 0);
+  const add = Math.max(...adds);
+  const work = sets.filter((st) => (num(st.w) || 0) === add);
+  const reps = work.map((st) => num(st.reps));
+  const avgRir = work.map((st) => (num(st.rir) === null ? rirTarget : num(st.rir))).reduce((a, b) => a + b, 0) / work.length;
+  const best = sessionBestE1rm(hist[hist.length - 1].ex, profile);
+  const clamp = (r) => Math.max(p.repMin, Math.min(p.repMax, r));
+
+  if (reps.every((r) => r >= p.repMax) && avgRir >= p.rirMin) {
+    const nextAdd = opts ? snapUp(opts, add) : roundTo(add + inc, inc);
+    const t = best ? clamp(repsAt(best, nextAdd)) : p.repMin;
+    return { kind: 'up', weight: nextAdd, reps: t, prevWeight: add, prevReps: Math.max(...reps), rir: rirTarget, inc, bw: true, loads: opts,
+      text: `Oberes Ende (${p.repMax} Wdh.) erreicht: ${fmtLoad(ex, nextAdd)}, Ziel ${t} Wdh. bei ca. ${rirTarget} RIR.${note}` };
+  }
+  if (Math.min(...reps) < p.repMin && avgRir <= p.rirMin) {
+    // So viel weniger Last, dass das untere Ende des Bereichs wieder machbar ist (über das 1RM)
+    const needed = best ? Math.floor((weightFor(best, p.repMin, rirTarget) - base) / inc) * inc : add - inc;
+    const lowerAdd = opts ? snapDown(opts, add) : Math.min(roundTo(add - inc, inc), needed);
+    const t = best ? clamp(repsAt(best, lowerAdd)) : p.repMin;
+    return { kind: 'down', weight: lowerAdd, reps: t, rir: rirTarget, inc, bw: true, loads: opts,
+      text: `Unter ${p.repMin} Wdh. ohne Reserve: ${fmtLoad(ex, lowerAdd)}, Ziel ${t} Wdh.${lowerAdd < 0 ? ' Unterstützung geht z. B. mit Widerstandsband oder Gegengewicht.' : ''}${note}` };
+  }
+  const t = Math.min(p.repMax, Math.max(...reps) + 1);
+  return { kind: 'reps', weight: add, reps: t, rir: rirTarget, inc, bw: true, loads: opts,
+    text: `${fmtLoad(ex, add)} halten, Ziel ${t} Wdh. pro Satz bei ca. ${rirTarget} RIR.${note}` };
 }
 
 // ---------- Verfügbare Gewichte je Übung (z. B. Kabelzug mit festen Plattenstufen)
