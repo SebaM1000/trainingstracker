@@ -33,6 +33,7 @@ sw.js                   Offline-Speicher (Service Worker)
 | Übungen ergänzen | `js/data/exercises.js` (oder in der App „Eigene Übung“) |
 | Progressionslogik | `suggestNext()` in `js/science/strength.js` |
 | Neue Hinweis-Regel | `RULES` in `js/science/coach.js` |
+| Abend-Zettel (Schlafauswertung) | `js/modules/abend.js`, Daten in `sleepLog` je Profil |
 | Neues Modul | Datei in `js/modules/` anlegen, in `js/app.js` importieren und registrieren |
 | Datenstruktur ändern | `SCHEMA_VERSION` und `MIGRATIONS` in `js/core/store.js` |
 

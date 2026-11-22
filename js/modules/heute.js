@@ -10,6 +10,7 @@ import { REFS } from '../science/references.js';
 import { assess, advice, LEVELS } from '../science/readiness.js';
 import { ymd, addDays } from '../core/dates.js';
 import { sparkline } from '../core/charts.js';
+import { abendCard } from './abend.js';
 
 // Kleines Erholungs-Dashboard: die letzten 14 Tage aus den Garmin-Tageswerten
 const METRICS = [
@@ -86,6 +87,8 @@ export default {
       h('span', { class: 'goal-chip' }, `Ziel: ${GOALS[p.goal].label}`)));
 
     if (m.tagesform !== false) { root.append(tagesformCard(ctx)); const ec = erholungCard(ctx); if (ec) root.append(ec); }
+
+    root.append(abendCard(ctx));
 
     const actions = h('div', { class: 'quick' });
     if (m.kraft !== false) actions.append(h('button', { class: 'btn primary', onclick: () => ctx.go('kraft') },

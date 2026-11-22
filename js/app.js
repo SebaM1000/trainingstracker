@@ -10,8 +10,9 @@ import fortschritt from './modules/fortschritt.js';
 import profil from './modules/profil.js';
 import wissen from './modules/wissen.js';
 import garmin from './modules/garmin.js';
+import abend from './modules/abend.js';
 
-[heute, kraft, ausdauer, fortschritt, profil, wissen, garmin].forEach(registry.register);
+[heute, kraft, ausdauer, fortschritt, profil, wissen, garmin, abend].forEach(registry.register);
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');

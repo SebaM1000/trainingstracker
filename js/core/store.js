@@ -30,6 +30,7 @@ export function newProfile(name = 'Ich', goal = 'hypertrophie') {
     equipment: {},
     templates: [],
     sessions: [],
+    sleepLog: {},
     draft: null,
   };
 }
