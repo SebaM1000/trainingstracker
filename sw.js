@@ -1,12 +1,12 @@
 // Service Worker: speichert die App für den Offline-Betrieb.
 // Nach Änderungen an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'v1.7.0';
+const VERSION = 'v1.8.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/core/store.js', './js/core/registry.js', './js/core/ui.js', './js/core/charts.js',
   './js/core/dates.js', './js/core/icons.js',
   './js/science/goals.js', './js/science/strength.js', './js/science/endurance.js', './js/science/load.js',
-  './js/science/coach.js', './js/science/references.js', './js/data/exercises.js',
+  './js/science/coach.js', './js/science/references.js', './js/data/exercises.js', './js/data/meals.js',
   './js/modules/heute.js', './js/modules/kraft.js', './js/modules/ausdauer.js',
   './js/modules/fortschritt.js', './js/modules/profil.js', './js/modules/wissen.js',
   './js/modules/garmin.js', './js/modules/abend.js', './js/modules/ernaehrung.js', './js/science/nutrition.js', './js/science/garmin.js', './js/science/readiness.js',
