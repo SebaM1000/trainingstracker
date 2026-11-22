@@ -4,7 +4,7 @@ import { ICONS } from '../core/icons.js';
 import { uid } from '../core/store.js';
 import { ymd, fmtDate } from '../core/dates.js';
 import { allExercises, exerciseById, MUSCLES } from '../data/exercises.js';
-import { suggestNext, historyFor, doneSets, sessionBestE1rm, tonnage } from '../science/strength.js';
+import { suggestNext, historyFor, doneSets, sessionBestE1rm, tonnage, loadOptions } from '../science/strength.js';
 import { sessionLoad } from '../science/load.js';
 import { absorbLoadOnly } from '../science/garmin.js';
 import { assess, adjustSuggestion, LEVELS } from '../science/readiness.js';
@@ -162,6 +162,7 @@ function renderDraft(root, ctx) {
           h('div', { class: 'muted small' }, def.p.map((m) => MUSCLES[m]).join(', '))),
         h('button', { class: 'icon-btn', 'aria-label': 'Übungsoptionen', onclick: () => exMenu(ctx, ei) }, '⋯')),
       h('div', { class: `hint ${sug.kind}` }, sug.text),
+      sug.loads ? h('div', { class: 'muted small' }, `Stufen: ${sug.loads.slice(0, 8).map((x) => String(x).replace('.', ',')).join(' – ')} kg`) : null,
       last ? h('div', { class: 'muted small' }, `Zuletzt (${fmtDate(last.date, false)}): `,
         doneSets(last.ex).map((s) => `${fmt(s.w, s.w % 1 ? 1 : 0)}×${s.reps}${s.rir !== '' && s.rir !== undefined ? ` @${s.rir}` : ''}`).join(', ')) : null,
       rows,
@@ -178,8 +179,51 @@ function renderDraft(root, ctx) {
       h('button', { class: 'btn primary grow', onclick: () => finish(ctx) }, 'Training beenden')));
 }
 
+// Verfügbare Gewichte einer Übung festlegen (z. B. Kabelzug: Plattenstufe 4,5 kg, Zusatzgewicht 2,3 kg)
+export function equipmentSheet(ctx, exId, onSaved) {
+  const p = ctx.store.profile();
+  const def = exerciseById(p, exId);
+  const cur = (p.equipment || {})[exId] || {};
+  const e = { start: cur.start ?? '', step: cur.step ?? '', max: cur.max ?? '', addOns: (cur.addOns || []).join('; ') };
+  const preview = h('p', { class: 'small muted' });
+  const toNum = (v) => Number(String(v).replace(',', '.'));
+  const parseAdds = () => String(e.addOns).split(';').map((x) => toNum(x.trim())).filter((x) => x > 0);
+  const draw = () => {
+    const opts = loadOptions({ equipment: { [exId]: { start: toNum(e.start), step: toNum(e.step), max: toNum(e.max), addOns: parseAdds() } } }, exId);
+    preview.textContent = opts
+      ? `Mögliche Gewichte: ${opts.slice(0, 14).map((x) => String(x).replace('.', ',')).join(' – ')}${opts.length > 14 ? ' …' : ''} kg`
+      : 'Plattenstufe eingeben, dann erscheint die Liste.';
+  };
+  const inp = (key, label, hint) => field(label, h('input', {
+    type: 'text', inputmode: 'decimal', value: e[key] === '' || e[key] === null ? '' : String(e[key]).replace('.', ','),
+    oninput: (ev) => { e[key] = ev.target.value; draw(); },
+  }), hint);
+  draw();
+  sheet(`Gewichtsstufen: ${def ? def.name : exId}`, h('div', { class: 'form' },
+    h('p', { class: 'small' }, 'Für Geräte mit festen Stufen, z. B. Kabelzug oder Maschine. Die Vorschläge springen dann nur auf Gewichte, die du wirklich einstellen kannst.'),
+    h('div', { class: 'grid2' }, inp('step', 'Plattenstufe (kg)', 'z. B. 4,5'), inp('start', 'Leichteste Stufe (kg)', 'leer = wie Plattenstufe')),
+    h('div', { class: 'grid2' }, inp('addOns', 'Zusatzgewichte (kg)', 'z. B. 2,3; mehrere mit ; trennen'), inp('max', 'Höchstes Gewicht (kg)', 'optional')),
+    preview), [
+    cur.step
+      ? { label: 'Zurücksetzen', kind: 'danger-ghost', onClick: () => { ctx.store.updateProfile((x) => { x.equipment = { ...x.equipment, [exId]: undefined }; }); onSaved && onSaved(); } }
+      : { label: 'Abbrechen' },
+    { label: 'Speichern', kind: 'primary', onClick: () => {
+      const step = toNum(e.step);
+      if (!(step > 0)) { toast('Bitte eine Plattenstufe eingeben.'); return false; }
+      ctx.store.updateProfile((x) => {
+        x.equipment = x.equipment || {};
+        x.equipment[exId] = { start: toNum(e.start) || step, step, max: toNum(e.max) || null, addOns: parseAdds() };
+      });
+      toast('Gewichtsstufen gespeichert.');
+      onSaved && onSaved();
+    } },
+  ]);
+}
+
 function exMenu(ctx, ei) {
+  const exId = ctx.store.profile().draft.exercises[ei].exId;
   sheet('Übung', (close) => h('div', { class: 'stack' },
+    h('button', { class: 'btn ghost full', onclick: () => { close(); equipmentSheet(ctx, exId, () => ctx.rerender()); } }, 'Gewichtsstufen einstellen (Kabelzug, Maschine)'),
     h('button', { class: 'btn ghost full', onclick: () => { close(); ctx.store.updateProfile((p) => {
       if (ei > 0) { const a = p.draft.exercises; [a[ei - 1], a[ei]] = [a[ei], a[ei - 1]]; } }); ctx.rerender(); } }, 'Nach oben verschieben'),
     h('button', { class: 'btn ghost full', onclick: () => { close(); pickExercise(ctx, (id) => {

@@ -27,6 +27,7 @@ export function newProfile(name = 'Ich', goal = 'hypertrophie') {
       increments: { compound: 2.5, isolation: 1 },
     },
     customExercises: [],
+    equipment: {},
     templates: [],
     sessions: [],
     draft: null,

@@ -130,7 +130,7 @@ export function adjustSuggestion(sug, level) {
     s.text = `Tagesform gelb: Gewicht halten${s.weight ? ` (${String(s.weight).replace('.', ',')} kg × ${s.reps})` : ''}, 1 RIR mehr Reserve, ein Satz weniger. Ohne Anpassung wäre es: ${sug.text}`;
     s.setsDelta = -1;
   } else if (level === 'rot') {
-    if (s.weight) s.weight = Math.round(s.weight * 0.85 / (s.inc || 1)) * (s.inc || 1);
+    if (s.weight) { const t = s.weight * 0.85; s.weight = s.loads ? s.loads.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a), s.loads[0]) : Math.round(t / (s.inc || 1)) * (s.inc || 1); }
     if (s.rir !== null && s.rir !== undefined) s.rir += 2;
     s.kind = 'down';
     s.text = `Tagesform rot: Heute besser Erholung. Falls doch: ca. 85 % Gewicht${s.weight ? ` (${String(s.weight).replace('.', ',')} kg)` : ''}, weit weg vom Versagen, halbes Volumen.`;
