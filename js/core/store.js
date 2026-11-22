@@ -18,12 +18,12 @@ export function newProfile(name = 'Ich', goal = 'hypertrophie') {
     id: uid(),
     name,
     createdAt: new Date().toISOString(),
-    body: { sex: '', birthYear: '', weightKg: '' },
+    body: { sex: '', birthYear: '', weightKg: '', heightCm: '', bodyFatPct: '' },
     physio: { hrMax: '', hrRest: '', lthr: '', ftp: '', thresholdPace: '' },
     goal,
     params: defaultParamsFor(goal),
     settings: {
-      modules: { kraft: true, ausdauer: true, fortschritt: true, garmin: true, tagesform: true },
+      modules: { kraft: true, ausdauer: true, fortschritt: true, garmin: true, tagesform: true, ernaehrung: true },
       increments: { compound: 2.5, isolation: 1 },
     },
     customExercises: [],
@@ -31,6 +31,7 @@ export function newProfile(name = 'Ich', goal = 'hypertrophie') {
     templates: [],
     sessions: [],
     sleepLog: {},
+    nutrition: { foods: [], days: {}, settings: {} },
     draft: null,
   };
 }

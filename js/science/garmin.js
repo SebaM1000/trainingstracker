@@ -58,7 +58,7 @@ function garminFields(w) {
     garminId: String(w.id), garminTyp: w.typ,
     avgHr: num(w.puls_avg) || '', garminRpe: watchRpe(w), gefuehl: w.gefuehl || null,
     garminDauer: num(w.dauer_min) ? Math.round(num(w.dauer_min)) : null,
-    garminLast: num(w.trainingslast), teAerob: num(w.te_aerob),
+    garminLast: num(w.trainingslast), teAerob: num(w.te_aerob), kcal: num(w.kalorien),
   };
 }
 
@@ -126,7 +126,7 @@ export function planImport(profile, data) {
       zoneMin: (w.zonen_min || ['', '', '', '', '']).map((x) => (num(x) === null ? '' : num(x))),
       notes: w.name || '',
       source: 'garmin', garminId: String(w.id), garminTyp: w.typ,
-      teAerob: num(w.te_aerob), garminLast: num(w.trainingslast),
+      teAerob: num(w.te_aerob), garminLast: num(w.trainingslast), kcal: num(w.kalorien),
     };
 
     if (old) { result.aktualisiert.push(session); continue; }
@@ -177,7 +177,7 @@ export function absorbLoadOnly(profile, session) {
   linkGarmin(session, {
     garminId: twin.garminId, garminTyp: twin.garminTyp, avgHr: twin.avgHr,
     garminRpe: twin.srpeQuelle === 'uhr' ? twin.srpe : twin.garminRpe ?? null,
-    gefuehl: twin.gefuehl, garminDauer: twin.durationMin, garminLast: twin.garminLast, teAerob: twin.teAerob,
+    gefuehl: twin.gefuehl, garminDauer: twin.durationMin, garminLast: twin.garminLast, teAerob: twin.teAerob, kcal: twin.kcal ?? null,
   });
   if (!session.srpe && twin.srpe) { session.srpe = twin.srpe; session.srpeQuelle = twin.srpeQuelle; }
   profile.sessions = profile.sessions.filter((s) => s.id !== twin.id);

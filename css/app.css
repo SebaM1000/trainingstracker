@@ -306,3 +306,25 @@ code { font-size: 0.92em; background: var(--surface-2); padding: 1px 5px; border
 .spark-ref { stroke: var(--text-2); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .spark-last { fill: var(--text); }
 .spark-empty { height: 44px; display: flex; align-items: center; }
+
+/* Ernährung */
+.day-nav { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
+.day-nav .icon-btn { font-size: 22px; min-width: 44px; }
+.day-nav .icon-btn[disabled] { opacity: .3; }
+.kcal-big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 18px; }
+.kcal-big strong { font-size: 30px; font-variant-numeric: tabular-nums; }
+.kcal-badge .badge { font-size: 13px; }
+.kcal-scale { position: relative; height: 14px; background: var(--surface-2); border-radius: 7px; margin: 22px 0 14px; }
+.kcal-band { position: absolute; top: -3px; bottom: -3px; background: rgba(12, 163, 12, .28); border: 1px solid var(--good); border-radius: 5px; }
+.kcal-fill { position: absolute; left: 0; top: 3px; bottom: 3px; background: var(--accent); border-radius: 4px; }
+.kcal-mark { position: absolute; top: -8px; bottom: -8px; width: 2px; background: var(--muted); }
+.kcal-mark.strong { background: var(--text); }
+.kcal-mark span { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+.kcal-mark.strong span { color: var(--text-2); }
+.macro { margin: 10px 0; }
+.macro-head { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+.macro-track { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+.macro-fill { height: 100%; background: var(--accent); }
+.macro-fill.over { background: var(--warning); }
+.food-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.food-row .btn.small { margin-top: 0; min-width: 44px; }
