@@ -23,7 +23,7 @@ export function newProfile(name = 'Ich', goal = 'hypertrophie') {
     goal,
     params: defaultParamsFor(goal),
     settings: {
-      modules: { kraft: true, ausdauer: true, fortschritt: true, garmin: true },
+      modules: { kraft: true, ausdauer: true, fortschritt: true, garmin: true, tagesform: true },
       increments: { compound: 2.5, isolation: 1 },
     },
     customExercises: [],

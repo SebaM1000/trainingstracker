@@ -125,7 +125,7 @@ function render(root, ctx) {
     h('button', { class: 'btn ghost small', onclick: () => { set((x) => { x.params = defaultParamsFor(x.goal); }); ctx.rerender(); toast('Auf Zielwerte zurückgesetzt.'); } }, 'Auf Zielwerte zurücksetzen')));
 
   // Module
-  const mods = [['kraft', 'Krafttraining'], ['ausdauer', 'Ausdauer & weitere Sportarten'], ['fortschritt', 'Fortschritt & Auswertung'], ['garmin', 'Garmin-Import']];
+  const mods = [['kraft', 'Krafttraining'], ['ausdauer', 'Ausdauer & weitere Sportarten'], ['fortschritt', 'Fortschritt & Auswertung'], ['garmin', 'Garmin-Import'], ['tagesform', 'Tagesform aus Garmin-Erholungswerten']];
   root.append(card('Module', h('div', { class: 'stack' }, mods.map(([k, l]) => h('label', { class: 'switch-row' },
     h('span', {}, l),
     h('input', { type: 'checkbox', role: 'switch', checked: p.settings.modules[k] !== false, onchange: (e) => { set((x) => { x.settings.modules[k] = e.target.checked; }); ctx.rerender(); } })))),

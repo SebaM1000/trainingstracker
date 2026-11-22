@@ -79,7 +79,7 @@ export function suggestNext(profile, exId) {
       text: `Letztes Mal deutlich zu leicht (Ø ${kg(avgRir.toFixed(1))} RIR). Neu berechnet aus e1RM: ${kg(nw)} kg × ${repMid}.` };
   }
   if (reps.every((r) => r >= p.repMax) && avgRir >= p.rirMin) {
-    return { kind: 'up', weight: roundTo(w + inc, inc), reps: p.repMin, rir: rirTarget, inc,
+    return { kind: 'up', weight: roundTo(w + inc, inc), reps: p.repMin, prevWeight: w, prevReps: Math.max(...reps), rir: rirTarget, inc,
       text: `Oberes Ende (${p.repMax} Wdh.) in allen Sätzen erreicht: +${kg(inc)} kg, wieder bei ${p.repMin} Wdh. starten.` };
   }
   if (Math.min(...reps) < p.repMin && avgRir <= p.rirMin) {

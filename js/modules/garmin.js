@@ -27,6 +27,7 @@ function preview(ctx) {
       h('div', { class: 'stat' }, h('div', { class: 'stat-label' }, 'Aktualisiert'), h('div', { class: 'stat-value' }, String(p.aktualisiert.length))),
       h('div', { class: 'stat' }, h('div', { class: 'stat-label' }, 'Mit App-Training verknüpft'), h('div', { class: 'stat-value' }, String(p.verknuepft.length)))),
     h('ul', { class: 'plain small' },
+      h('li', {}, `Tageswerte für die Tagesform (Schlaf, HRV, Ruhepuls, Readiness): ${Object.keys(p.wellness || {}).length} Tage`),
       h('li', {}, `Davon Krafttraining nur von der Uhr (ohne Sätze): ${count((s) => s.type === 'kraft')}`),
       h('li', {}, `Anstrengung von der Uhr: ${count((s) => s.srpeQuelle === 'uhr') + p.verknuepft.filter((v) => v.patch.garminRpe).length}`),
       h('li', {}, `Anstrengung aus dem Puls geschätzt: ${count((s) => String(s.srpeQuelle).startsWith('geschätzt'))}`),
@@ -35,7 +36,7 @@ function preview(ctx) {
       skipped.map(([why, n]) => h('li', { class: 'muted' }, `Nicht übernommen: ${n} × ${why}`))),
     h('div', { class: 'row gap' },
       h('button', { class: 'btn ghost', onclick: () => { pending = null; ctx.rerender(); } }, 'Abbrechen'),
-      h('button', { class: 'btn primary grow', disabled: !all.length && !p.verknuepft.length, onclick: () => {
+      h('button', { class: 'btn primary grow', disabled: !all.length && !p.verknuepft.length && !Object.keys(p.wellness || {}).length, onclick: () => {
         ctx.store.updateProfile((pr) => applyImport(pr, pending));
         toast(`${all.length + pending.verknuepft.length} Einheiten aus Garmin übernommen.`);
         pending = null;

@@ -7,6 +7,28 @@ import { hints } from '../science/coach.js';
 import { GOALS } from '../science/goals.js';
 import { SPORTS } from '../science/endurance.js';
 import { REFS } from '../science/references.js';
+import { assess, advice, LEVELS } from '../science/readiness.js';
+import { ymd } from '../core/dates.js';
+
+function tagesformCard(ctx) {
+  const p = ctx.profile;
+  const r = assess(p);
+  const L = LEVELS[r.level];
+  const setOverride = (level) => { ctx.store.updateProfile((x) => { x.tagesformOverride = level ? { date: ymd(), level } : null; }); ctx.rerender(); };
+  return card('Tagesform',
+    h('div', { class: `tf-head tf-${r.level}` }, badge(L.status, L.label)),
+    r.date ? h('p', { class: 'muted small' }, r.manual ? 'Von dir für heute selbst eingestuft.' : `Garmin-Werte vom ${fmtDate(r.date)}${r.stale ? ' (veraltet, bitte aktuelle data.json importieren)' : ''}.`) : null,
+    r.signals.length ? h('ul', { class: 'hints' }, r.signals.map((x) => h('li', {}, badge(x.points === 0 ? 'good' : x.points === 1 ? 'warning' : 'serious', ''), h('span', {}, x.text)))) : h('p', { class: 'small' }, r.reason || ''),
+    h('div', { class: 'tf-advice' }, advice(r.level).map((t) => h('p', { class: 'small' }, t))),
+    h('details', { class: 'details' }, h('summary', {}, 'Ich fühle mich anders'),
+      h('p', { class: 'muted small' }, 'Dein eigenes Gefühl zählt: Subjektive Angaben spiegeln die Belastung oft besser als Messwerte. Hier kannst du die Einstufung für heute überschreiben.'),
+      h('div', { class: 'chips wrap' },
+        h('button', { class: 'chip', onclick: () => setOverride('gruen') }, 'Grün'),
+        h('button', { class: 'chip', onclick: () => setOverride('gelb') }, 'Gelb'),
+        h('button', { class: 'chip', onclick: () => setOverride('rot') }, 'Rot'),
+        r.manual ? h('button', { class: 'chip', onclick: () => setOverride(null) }, 'Zurück zur automatischen Bewertung') : null)),
+    h('a', { class: 'ref small', href: '#wissen' }, 'Wie wird das berechnet?'));
+}
 
 export default {
   id: 'heute', title: 'Heute', icon: ICONS.heute, order: 1, nav: true,
@@ -21,6 +43,8 @@ export default {
     root.append(h('div', { class: 'hello' },
       h('h1', {}, `Hallo ${p.name}`),
       h('span', { class: 'goal-chip' }, `Ziel: ${GOALS[p.goal].label}`)));
+
+    if (m.tagesform !== false) root.append(tagesformCard(ctx));
 
     const actions = h('div', { class: 'quick' });
     if (m.kraft !== false) actions.append(h('button', { class: 'btn primary', onclick: () => ctx.go('kraft') },

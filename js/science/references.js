@@ -80,6 +80,18 @@ export const REFS = {
     cite: 'Allen H, Coggan A (2010). Training and Racing with a Power Meter (2. Aufl.). Boulder: VeloPress.',
     use: 'Leistungszonen in % der FTP für Rad und Ergometer.',
   },
+  manresa2021: {
+    cite: 'Manresa-Rocamora A et al. (2021). Heart rate variability-guided training for enhancing cardiac-vagal modulation, aerobic fitness, and endurance performance: a methodological systematic review with meta-analysis. International Journal of Environmental Research and Public Health 18(19), 10299.',
+    use: 'HRV-gesteuertes Training verbessert die HRV; bei Ausdauerleistung kleine, nicht signifikante Vorteile gegenüber festem Plan.',
+  },
+  dueking2021: {
+    cite: 'Düking P, Zinner C, Reed JL, Holmberg HC, Sperlich B. Predefined vs data-guided training prescription based on autonomic nervous system variation: a systematic review. Scandinavian Journal of Medicine & Science in Sports, doi:10.1111/sms.13802.',
+    use: 'Datengesteuerte Pläne erreichen ähnliche Anpassungen mit weniger intensiven Einheiten.',
+  },
+  saw2016: {
+    cite: 'Saw AE, Main LC, Gastin PB (2016). Monitoring the athlete training response: subjective self-reported measures trump commonly used objective measures. British Journal of Sports Medicine 50(5), 281–291.',
+    use: 'Eigene Einschätzung (Befinden, Müdigkeit) reagiert empfindlich auf Belastung; deshalb lässt sich die Tagesform manuell überschreiben.',
+  },
   who2020: {
     cite: 'Bull FC, Al-Ansari SS, Biddle S et al. (2020). World Health Organization 2020 guidelines on physical activity and sedentary behaviour. British Journal of Sports Medicine 54(24), 1451–1462.',
     use: 'Mindestumfang für das Ziel Gesundheit.',

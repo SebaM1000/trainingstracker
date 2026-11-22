@@ -7,6 +7,11 @@ import { allExercises, exerciseById, MUSCLES } from '../data/exercises.js';
 import { suggestNext, historyFor, doneSets, sessionBestE1rm, tonnage } from '../science/strength.js';
 import { sessionLoad } from '../science/load.js';
 import { absorbLoadOnly } from '../science/garmin.js';
+import { assess, adjustSuggestion, LEVELS } from '../science/readiness.js';
+
+const tagesform = (profile) => (profile.settings.modules.tagesform === false ? 'unbekannt' : assess(profile).level);
+const daySuggestion = (profile, exId) => adjustSuggestion(suggestNext(profile, exId), tagesform(profile));
+const daySets = (n, sug) => Math.max(1, sug.setsDelta === -99 ? Math.ceil(n / 2) : n + (sug.setsDelta || 0));
 
 const T = (id, sets = 3) => ({ exId: id, sets });
 export const PRESET_TEMPLATES = [
@@ -56,8 +61,8 @@ function newSetFrom(sug, prev) {
 }
 
 function makeExercise(profile, exId, nSets = 3) {
-  const sug = suggestNext(profile, exId);
-  return { exId, sets: Array.from({ length: nSets }, () => newSetFrom(sug)) };
+  const sug = daySuggestion(profile, exId);
+  return { exId, sets: Array.from({ length: daySets(nSets, sug) }, () => newSetFrom(sug)) };
 }
 
 // ---------- Übungsauswahl ----------
@@ -121,13 +126,16 @@ function renderDraft(root, ctx) {
   };
   let iv = null; tick(); iv = setInterval(tick, 15000);
 
+  const lvl = tagesform(p);
+  if (lvl === 'gelb' || lvl === 'rot') root.append(h('div', { class: `hint ${lvl === 'rot' ? 'down' : ''}` },
+    `${LEVELS[lvl].label}. Die Vorschläge unten sind für heute angepasst. `, h('a', { href: '#heute' }, 'Details')));
   root.append(h('div', { class: 'draft-head' },
     h('input', { class: 'title-input', value: d.name, 'aria-label': 'Name der Einheit', oninput: (e) => save((x) => { x.name = e.target.value; }) }),
     h('div', { class: 'muted small' }, d.editingId ? `Bearbeitung vom ${fmtDate(d.date)}` : 'Läuft seit ', d.editingId ? null : elapsed)));
 
   d.exercises.forEach((ex, ei) => {
     const def = exerciseById(p, ex.exId) || { name: 'Unbekannte Übung', cat: 'compound', p: [], s: [] };
-    const sug = suggestNext(p, ex.exId);
+    const sug = daySuggestion(p, ex.exId);
     const hist = historyFor(p, ex.exId).filter((x) => x.sessionId !== d.editingId);
     const last = hist[hist.length - 1];
     const rest = def.cat === 'compound' ? p.params.restCompound : p.params.restIsolation;

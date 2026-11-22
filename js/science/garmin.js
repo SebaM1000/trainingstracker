@@ -7,6 +7,7 @@
 // Sonst entsteht eine Einheit „nur von der Uhr“ (ohne Sätze), die später automatisch
 // mit deinem App-Eintrag zusammengeführt wird.
 import { zoneOfHr } from './endurance.js';
+import { wellnessFromGarmin } from './readiness.js';
 
 const num = (v) => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
 
@@ -69,7 +70,7 @@ export function planImport(profile, data) {
   const byGarminId = new Map(profile.sessions.filter((s) => s.garminId && s.source !== 'garmin').map((s) => [s.garminId, s]));
   const manual = profile.sessions.filter((s) => s.source !== 'garmin');
   const linkedAppIds = new Set();
-  const result = { neu: [], aktualisiert: [], verknuepft: [], doppelt: [], uebersprungen: {}, ohneRpe: 0 };
+  const result = { neu: [], aktualisiert: [], verknuepft: [], doppelt: [], uebersprungen: {}, ohneRpe: 0, wellness: wellnessFromGarmin(data && data.tage) };
   const skip = (why) => { result.uebersprungen[why] = (result.uebersprungen[why] || 0) + 1; };
 
   // Älteste zuerst, damit bei mehreren Garmin-Krafteinheiten an einem Tag die erste verknüpft wird
@@ -162,6 +163,9 @@ export function applyImport(profile, plan) {
   }
   profile.sessions.push(...plan.neu);
   profile.sessions.sort((a, b) => a.date.localeCompare(b.date));
+  // Tageswerte zusammenführen, nur die letzten 180 Tage behalten
+  const well = { ...(profile.wellness || {}), ...(plan.wellness || {}) };
+  profile.wellness = Object.fromEntries(Object.entries(well).sort().slice(-180));
   profile.garminImport = { zuletzt: new Date().toISOString(), anzahl: plan.neu.length + plan.aktualisiert.length + plan.verknuepft.length };
 }
 
