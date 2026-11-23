@@ -131,16 +131,15 @@ export function abendCard(ctx) {
   const log = p.sleepLog || {};
   const done = !!log[date];
   const count = Object.keys(log).length;
-  const body = h('div', {});
-  const show = (open) => body.replaceChildren(open
-    ? form(ctx, date, () => ctx.rerender())
-    : h('button', { class: 'btn ghost full', onclick: () => show(true) }, 'Eintrag ändern'));
-  show(!done);
-  return card(`Abend-Zettel: ${fmtDate(date)}`,
-    h('p', { class: 'muted small' }, done ? 'Für heute eingetragen.' : 'Vier Angaben, dauert zehn Sekunden.',
-      ` ${count} von ${ZIEL_ABENDE} Abenden gesammelt.`),
-    body,
-    h('a', { class: 'ref small', href: '#abend' }, 'Alle Abende ansehen und für die Auswertung kopieren'));
+  const sec = h('section', { class: 'card compact' });
+  const head = (open) => h('div', { class: 'row-between' },
+    h('div', {}, h('strong', {}, 'Abend-Zettel'),
+      h('div', { class: 'muted small' }, done ? `${fmtDate(date, false)} eingetragen, ${count} von ${ZIEL_ABENDE} Abenden` : `${fmtDate(date, false)} noch offen, ${count} von ${ZIEL_ABENDE} Abenden`)),
+    open ? null : h('button', { class: `btn ${done ? 'ghost' : 'primary'} small`, onclick: () => draw(true) }, done ? 'Ändern' : 'Ausfüllen'));
+  const draw = (open) => sec.replaceChildren(head(open), ...(open ? [form(ctx, date, () => ctx.rerender()),
+    h('a', { class: 'ref small', href: '#abend' }, 'Alle Abende ansehen und für die Auswertung kopieren')] : []));
+  draw(false);
+  return sec;
 }
 
 function render(root, ctx) {

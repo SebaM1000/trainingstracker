@@ -20,6 +20,10 @@ function ensure(p) {
     const std = p.nutrition.presets.find((x) => x.key === 'std-fruehstueck');
     const neu = DEFAULT_PRESETS.find((x) => x.key === 'std-fruehstueck');
     if (std && std.kcal === 869) Object.assign(std, { kcal: neu.kcal, p: neu.p, c: neu.c, f: neu.f, note: neu.note });
+    // Neue Vorlagen ergänzen, selbst gelöschte nicht zurückholen
+    const have = new Set(p.nutrition.presets.map((x) => x.key).filter(Boolean));
+    const removed = new Set(p.nutrition.removedKeys || []);
+    for (const x of DEFAULT_PRESETS) if (!have.has(x.key) && !removed.has(x.key)) p.nutrition.presets.push({ id: uid(), ...x });
     p.nutrition.presetsVersion = PRESETS_VERSION;
   }
   return p.nutrition;
@@ -44,17 +48,33 @@ function breakfastButton(ctx, date, small = false) {
     done ? `${pr.name} nochmal eintragen` : `${pr.name} eintragen (${fmt(pr.kcal)} kcal, ${fmt(pr.p)} g Eiweiß)`);
 }
 
+// Schnellauswahl: Reiter pro Kategorie und Suche, damit auch lange Listen übersichtlich bleiben
+let quickCat = 'gericht';
 function quickCard(ctx, date) {
   const nu = ensure(ctx.profile);
-  const groups = Object.keys(CATS).map((cat) => {
-    const list = nu.presets.filter((x) => x.cat === cat && !x.standard);
-    if (!list.length) return null;
-    return h('div', { class: 'field' }, h('span', { class: 'field-label' }, CATS[cat]),
-      h('div', { class: 'chips wrap' }, list.map((pr) => h('button', { type: 'button', class: 'chip', onclick: () => addPreset(ctx, date, pr) }, pr.name))));
-  });
-  return card('Schnellauswahl', breakfastButton(ctx, date),
-    h('p', { class: 'muted small' }, 'Ein Tipp trägt eine Portion ein, zweimal tippen für zwei. Falsch getippt? Unten bei „Eingetragen“ wieder entfernen.'),
-    h('div', { class: 'form' }, groups));
+  const cats = Object.keys(CATS).filter((cat) => nu.presets.some((x) => x.cat === cat && !x.standard));
+  if (!cats.includes(quickCat)) quickCat = cats[0];
+  let q = '';
+  let all = false;
+  const tabs = h('div', { class: 'seg' });
+  const list = h('div', { class: 'pick-list' });
+  const draw = () => {
+    tabs.replaceChildren(...cats.map((cat) => h('button', { type: 'button', class: `seg-btn ${!q && cat === quickCat ? 'active' : ''}`,
+      onclick: () => { quickCat = cat; q = ''; all = false; search.value = ''; draw(); } }, CATS[cat])));
+    const items = nu.presets.filter((x) => !x.standard && (q ? x.name.toLowerCase().includes(q.toLowerCase()) : x.cat === quickCat))
+      .sort((x, y) => x.name.localeCompare(y.name, 'de'));
+    const LIMIT = 8;
+    const shown = q || all ? items : items.slice(0, LIMIT);
+    list.replaceChildren(...(items.length ? shown.map((pr) => h('button', { type: 'button', class: 'pick-row', onclick: () => addPreset(ctx, date, pr) },
+      h('span', { class: 'pick-name' }, pr.name),
+      h('span', { class: 'pick-kcal' }, `${fmt(pr.kcal)} kcal`, h('span', { class: 'muted small block' }, `${fmt(pr.p)} g E`)),
+      h('span', { class: 'pick-plus', 'aria-hidden': 'true' }, '+'))) : [h('p', { class: 'muted small' }, 'Nichts gefunden. Unten bei „Meine Vorlagen“ kannst du neue Gerichte anlegen.')]),
+      ...(shown.length < items.length ? [h('button', { type: 'button', class: 'btn ghost small full', onclick: () => { all = true; draw(); } }, `Alle ${items.length} anzeigen`)] : []));
+  };
+  const search = h('input', { type: 'search', placeholder: 'Gericht suchen, z. B. Lachs', 'aria-label': 'Vorlagen durchsuchen', oninput: (e) => { q = e.target.value.trim(); draw(); } });
+  draw();
+  return card('Schnellauswahl', breakfastButton(ctx, date), search, tabs, list,
+    h('p', { class: 'muted small' }, 'Ein Tipp trägt eine Portion ein. Gerichte sind auf 4 Portionen ausgelegt, die Werte gelten für eine. Falsch getippt? Unten bei „Eingetragen“ entfernen.'));
 }
 
 function presetForm(pr, onSave) {
@@ -95,7 +115,7 @@ function presetsCard(ctx, date) {
         h('strong', {}, pr.name, pr.standard ? ' (Standard)' : ''),
         h('span', { class: 'muted small block' }, `${fmt(pr.kcal)} kcal | E ${fmt(pr.p, 1)} | K ${fmt(pr.c, 1)} | F ${fmt(pr.f, 1)}${pr.note ? ` | ${pr.note}` : ''}`)),
       h('button', { class: 'icon-btn', 'aria-label': `${pr.name} löschen`, onclick: () => confirmSheet(`„${pr.name}“ löschen?`, 'Bereits eingetragene Mahlzeiten bleiben erhalten.', 'Löschen', () => {
-        ctx.store.updateProfile((x) => { ensure(x).presets = ensure(x).presets.filter((y) => y.id !== pr.id); }); ctx.rerender(); }) }, '✕')))];
+        ctx.store.updateProfile((x) => { const nu = ensure(x); if (pr.key) nu.removedKeys = [...new Set([...(nu.removedKeys || []), pr.key])]; nu.presets = nu.presets.filter((y) => y.id !== pr.id); }); ctx.rerender(); }) }, '✕')))];
   });
   return card(`Meine Vorlagen (${nu.presets.length})`,
     h('details', { class: 'details' }, h('summary', {}, 'Vorlagen ansehen und bearbeiten'),
@@ -281,25 +301,36 @@ function weekCard(p, end) {
   return card('Letzte 7 Tage', rows);
 }
 
-// Kleine Karte für die Startseite
+// Vorlagen anlegen bzw. auf den neuen Stand bringen und dauerhaft speichern
+function migrate(ctx) {
+  const p = ctx.profile;
+  if (!p.nutrition || !p.nutrition.presets || (p.nutrition.presetsVersion || 1) < PRESETS_VERSION) ctx.store.updateProfile((x) => ensure(x));
+}
+
+// Kleine Karte für die Startseite: zwei Fortschrittsbalken und zwei Knöpfe
 export function ernaehrungCard(ctx) {
+  migrate(ctx);
   const p = ctx.profile;
   const d = ymd();
   const need = dayNeed(p, d);
   const eaten = sumDay(((p.nutrition || {}).days || {})[d]);
   const tg = need.ready ? targets(p, need) : null;
-  const bal = tg && eaten.kcal ? balance(eaten.kcal, need, tg) : null;
+  const pr = standardBreakfast(p);
+  const done = pr && ((p.nutrition.days || {})[d] || []).some((e) => e.presetId === pr.id);
+  const bar = (label, val, target, unit) => h('div', { class: 'macro' },
+    h('div', { class: 'macro-head' }, h('span', {}, label), h('span', { class: 'muted small' }, `${fmt(val)} / ${fmt(target)} ${unit}`)),
+    h('div', { class: 'macro-track' }, h('div', { class: 'macro-fill', style: { width: `${target ? Math.min(100, (val / target) * 100) : 0}%` } })));
   return card('Ernährung heute',
-    need.ready
-      ? h('p', { class: 'small' }, `${fmt(eaten.kcal)} von ${fmt(tg.kcalMid)} kcal | Eiweiß ${fmt(eaten.p)} von ${fmt(tg.protein)} g `, bal ? badge(bal.level, bal.label) : null)
+    tg ? [bar('Kalorien', eaten.kcal, tg.kcalMid, 'kcal'), bar('Eiweiß', eaten.p, tg.protein, 'g')]
       : h('p', { class: 'muted small' }, 'Trag einmal deine Körperdaten ein, dann rechnet die App deinen Bedarf.'),
-    breakfastButton(ctx, d, true),
-    h('button', { class: 'btn ghost small', onclick: () => ctx.go('ernaehrung') }, 'Essen eintragen'));
+    h('div', { class: 'quick tight' },
+      pr && !done ? h('button', { class: 'btn primary small', onclick: () => addPreset(ctx, d, pr) }, 'Frühstück eintragen') : null,
+      h('button', { class: `btn ghost small${pr && !done ? '' : ' span2'}`, onclick: () => ctx.go('ernaehrung') }, '+ Essen eintragen')));
 }
 
 function render(root, ctx) {
   const p = ctx.profile;
-  if (!p.nutrition || !p.nutrition.presets || (p.nutrition.presetsVersion || 1) < PRESETS_VERSION) ctx.store.updateProfile((x) => ensure(x));
+  migrate(ctx);
   ensure(p);
   const today = ymd();
   let date = sessionStorageGet() || today;
