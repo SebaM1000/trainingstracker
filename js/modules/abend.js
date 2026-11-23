@@ -164,4 +164,4 @@ function render(root, ctx) {
     h('p', { class: 'muted small' }, 'Eine Nacht zählt zum Abend, an dem du ins Bett gehst. Einträge vor 12 Uhr landen automatisch beim Vorabend.')));
 }
 
-export default { id: 'abend', title: 'Abend-Zettel', icon: '', order: 7, nav: false, optional: false, render };
+export default { id: 'abend', title: 'Abend-Zettel', icon: '', order: 7, nav: false, optional: true, render };

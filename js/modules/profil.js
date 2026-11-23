@@ -125,11 +125,11 @@ function render(root, ctx) {
     h('button', { class: 'btn ghost small', onclick: () => { set((x) => { x.params = defaultParamsFor(x.goal); }); ctx.rerender(); toast('Auf Zielwerte zurückgesetzt.'); } }, 'Auf Zielwerte zurücksetzen')));
 
   // Module
-  const mods = [['kraft', 'Krafttraining'], ['ausdauer', 'Ausdauer & weitere Sportarten'], ['fortschritt', 'Fortschritt & Auswertung'], ['ernaehrung', 'Ernährung (Kalorien und Makros)'], ['garmin', 'Garmin-Import'], ['tagesform', 'Tagesform aus Garmin-Erholungswerten']];
+  const mods = [['kraft', 'Krafttraining'], ['ausdauer', 'Ausdauer & weitere Sportarten'], ['fortschritt', 'Fortschritt & Auswertung'], ['ernaehrung', 'Ernährung (Kalorien und Makros)'], ['abend', 'Abend-Zettel für die Schlafauswertung'], ['garmin', 'Garmin-Import'], ['tagesform', 'Tagesform aus Garmin-Erholungswerten']];
   root.append(card('Module', h('div', { class: 'stack' }, mods.map(([k, l]) => h('label', { class: 'switch-row' },
     h('span', {}, l),
     h('input', { type: 'checkbox', role: 'switch', checked: p.settings.modules[k] !== false, onchange: (e) => { set((x) => { x.settings.modules[k] = e.target.checked; }); ctx.rerender(); } })))),
-    h('p', { class: 'muted small' }, 'Weitere Module (z. B. Wellness-Check, Periodisierung) lassen sich später ergänzen.')));
+    h('p', { class: 'muted small' }, 'Ausgeschaltete Module verschwinden aus der App, deine Daten darin bleiben erhalten. Du kannst sie jederzeit wieder einschalten.')));
 
   if (p.settings.modules.garmin !== false) root.append(card('Garmin',
     h('p', { class: 'muted small' }, 'Ausdauereinheiten aus deiner Garmin-Uhr übernehmen und die Anstrengung nachtragen.'),

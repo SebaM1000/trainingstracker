@@ -101,7 +101,7 @@ export default {
 
     if (m.tagesform !== false) root.append(tagesformCard(ctx));
     if (m.ernaehrung !== false) root.append(ernaehrungCard(ctx));
-    root.append(abendCard(ctx));
+    if (m.abend !== false) root.append(abendCard(ctx));
 
     const stats = h('div', { class: 'stats' });
     if (m.kraft !== false) stats.append(stat('Kraft', `${w.kraft} / ${p.params.strengthDays}`, 'Einheiten'));
