@@ -1,6 +1,6 @@
 // Service Worker: speichert die App für den Offline-Betrieb.
 // Nach Änderungen an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'v1.9.1';
+const VERSION = 'v1.9.2';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/core/store.js', './js/core/registry.js', './js/core/ui.js', './js/core/charts.js',
