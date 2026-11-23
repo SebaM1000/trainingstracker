@@ -20,6 +20,10 @@ function ensure(p) {
     const std = p.nutrition.presets.find((x) => x.key === 'std-fruehstueck');
     const neu = DEFAULT_PRESETS.find((x) => x.key === 'std-fruehstueck');
     if (std && std.kcal === 869) Object.assign(std, { kcal: neu.kcal, p: neu.p, c: neu.c, f: neu.f, note: neu.note });
+    // Lahmacun von mager auf normales Hack umgestellt (nur wenn noch unverändert)
+    const lah = p.nutrition.presets.find((x) => x.key === 'g-protein-lahmacun' && x.kcal === 1080);
+    const lahNeu = DEFAULT_PRESETS.find((x) => x.key === 'g-protein-lahmacun');
+    if (lah && lahNeu) Object.assign(lah, { kcal: lahNeu.kcal, p: lahNeu.p, c: lahNeu.c, f: lahNeu.f, note: lahNeu.note });
     // Neue Vorlagen ergänzen, selbst gelöschte nicht zurückholen
     const have = new Set(p.nutrition.presets.map((x) => x.key).filter(Boolean));
     const removed = new Set(p.nutrition.removedKeys || []);

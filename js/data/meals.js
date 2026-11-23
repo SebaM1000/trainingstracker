@@ -64,7 +64,7 @@ export const DEFAULT_PRESETS = [
   { key: 'g-linsencurry', name: 'Rotes Linsencurry mit Reis', cat: 'gericht', kcal: 620, p: 26, c: 95, f: 14, note: '80 g rote Linsen (roh), Kokosmilch light, Gemüse, 60 g Reis (roh)' },
   { key: 'g-gnocchi', name: 'Gnocchi aus dem Ofen mit Tomate und Mozzarella', cat: 'gericht', kcal: 580, p: 22, c: 90, f: 12, note: '250 g Gnocchi, Tomaten, 60 g Mozzarella light' },
   { key: 'g-frei', name: 'Freies Essen (Restaurant, grob)', cat: 'gericht', kcal: 900, p: 40, c: 90, f: 40, note: 'grobe Schätzung, z. B. für den freien Sonntag' },
-  { key: 'g-protein-lahmacun', name: 'Protein-Lahmacun (4 Wraps)', cat: 'gericht', kcal: 1080, p: 111, c: 84, f: 31, note: 'ganze Menge: 4 Proteinwraps, 300 g Rinderhack (mager), 50 g Joghurt, je 50 g Paprika, Zwiebel, Tomate, Gurke' },
+  { key: 'g-protein-lahmacun', name: 'Protein-Lahmacun (4 Wraps)', cat: 'gericht', kcal: 1350, p: 108, c: 84, f: 61, note: 'ganze Menge: 4 Proteinwraps, 300 g Rinderhack (normal, ca. 15 % Fett), 50 g Joghurt, je 50 g Paprika, Zwiebel, Tomate, Gurke' },
   { key: 'g-pizza', name: 'Pizza Margherita (ganze)', cat: 'gericht', kcal: 950, p: 38, c: 120, f: 33, note: 'Restaurant oder Tiefkühl, grob' },
 
 
@@ -78,4 +78,4 @@ export const CATS = { gericht: 'Gerichte', snack: 'Zwischenmahlzeiten', dessert:
 
 // Versionsstand der Vorlagen. Bei neuen Vorlagen oder Änderungen am Standard-Frühstück hochzählen:
 // fehlende Vorlagen kommen dann ins Profil (außer selbst gelöschte), ein unverändertes Frühstück wird angepasst.
-export const PRESETS_VERSION = 4;
+export const PRESETS_VERSION = 5;
