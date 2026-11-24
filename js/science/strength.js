@@ -181,6 +181,66 @@ function suggestBodyweight(profile, ex, hist) {
     text: `${fmtLoad(ex, add)} halten, Ziel ${t} Wdh. pro Satz bei ca. ${rirTarget} RIR.${note}` };
 }
 
+// ---------- Anpassung innerhalb der Einheit (Autoregulation von Satz zu Satz)
+// Nach einem bestätigten Satz wird aus Gewicht, Wiederholungen und RIR das Tages-1RM geschätzt
+// (Epley, RIR-bereinigt) und daraus der nächste Satz so geplant, dass er bei der Ziel-RIR endet:
+// Wiederholungsbereich ausschöpfen, bei deutlicher Reserve eine Gewichtsstufe hoch, bei zu wenig
+// Wiederholungen eine Stufe runter. Jeder weitere bestätigte Satz korrigiert erneut (Ermüdung).
+export function nextSetTarget(profile, exId, set, { rirTarget, allowUp = true } = {}) {
+  const p = profile.params;
+  const def = exerciseById(profile, exId);
+  const r = num(set.reps);
+  if (!r) return null;
+  const rirT = num(rirTarget) ?? Math.round((p.rirMin + p.rirMax) / 2);
+  const rir = num(set.rir) ?? rirT;
+  const w = num(set.w) || 0;
+  const bw = !!(def && def.bw);
+  const load = bw ? effectiveLoad(profile, def, w) : w;
+  const EXT_MAX = 25;
+  const lbl = (x) => (bw ? fmtLoad(def, x) : `${kg(x)} kg`);
+  if (!load || load <= 0) {
+    const reps = Math.max(1, Math.min(EXT_MAX, r + rir - rirT));
+    return { w: set.w, reps, rir: rirT, kind: 'reps', text: `Nächster Satz: ${reps} Wdh. bei ca. ${rirT} RIR.` };
+  }
+  const e1 = e1rm(load, r, rir);
+  const base = load - w; // bei Körpergewicht der Körperanteil, sonst 0
+  const repsAt = (add) => Math.floor(e1 / (base + add) * 30 - 30 - rirT + 1e-6);
+  const inc = bw || (def && def.cat === 'compound')
+    ? Number(profile.settings.increments.compound) || 2.5
+    : Number(profile.settings.increments.isolation) || 1;
+  const opts = loadOptions(profile, exId);
+  const up = (x) => (opts ? snapUp(opts, x) : roundTo(x + inc, inc));
+  const down = (x) => (opts ? snapDown(opts, x) : roundTo(x - inc, inc));
+  const same = repsAt(w);
+  const why = `Satz mit ${lbl(w)} × ${r}${num(set.rir) !== null ? ` bei ${rir} RIR` : ''}`;
+
+  if (same > p.repMax) {
+    const nw = up(w);
+    const rn = repsAt(nw);
+    if (allowUp && nw > w && rn >= p.repMin) {
+      const reps = Math.min(p.repMax, rn);
+      return { w: nw, reps, rir: rirT, kind: 'up', text: `${why} hatte Reserve: nächster Satz ${lbl(nw)} × ${reps} bei ca. ${rirT} RIR.` };
+    }
+    const reps = allowUp ? Math.min(EXT_MAX, same) : p.repMax;
+    return { w, reps, rir: rirT, kind: 'reps', text: allowUp
+      ? `${why} hatte Reserve. Die nächste Stufe (${lbl(nw)}) wäre zu viel, also Wiederholungen steigern: ${reps} Wdh. bei ca. ${rirT} RIR.`
+      : `${why} lief leicht, wegen der Tagesform bleibt das Gewicht: ${reps} Wdh. bei ca. ${rirT} RIR.` };
+  }
+  if (same < p.repMin) {
+    // so weit runter, dass das untere Ende des Bereichs wieder bei Ziel-RIR machbar ist
+    const goal = weightFor(e1, p.repMin, rirT) - base;
+    const fit = opts ? ([...opts].reverse().find((x) => x <= goal + 1e-9) ?? opts[0]) : Math.floor(goal / inc + 1e-9) * inc;
+    let nw = Math.min(down(w), fit);
+    if (bw && w >= 0) nw = Math.max(0, nw); // mitten im Training keine Unterstützung (Band) vorschlagen
+    if (nw < w && (bw || nw > 0)) {
+      const reps = Math.max(1, Math.min(p.repMax, repsAt(nw)));
+      return { w: nw, reps, rir: rirT, kind: 'down', text: `${why} war zu schwer für ${p.repMin}–${p.repMax} Wdh.: nächster Satz ${lbl(nw)} × ${reps} bei ca. ${rirT} RIR.` };
+    }
+  }
+  const reps = Math.max(1, Math.min(p.repMax, same));
+  return { w, reps, rir: rirT, kind: 'reps', text: `${why}: nächster Satz ${lbl(w)} × ${reps} bei ca. ${rirT} RIR.` };
+}
+
 // ---------- Verfügbare Gewichte je Übung (z. B. Kabelzug mit festen Plattenstufen)
 // Einstellung im Profil: equipment[exId] = { start, step, max, addOns: [kg, ...] }
 // Mögliche Lasten = start + k × step, jeweils auch plus jede Kombination der Zusatzgewichte.

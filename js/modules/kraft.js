@@ -4,7 +4,7 @@ import { ICONS } from '../core/icons.js';
 import { uid } from '../core/store.js';
 import { ymd, fmtDate } from '../core/dates.js';
 import { allExercises, exerciseById, MUSCLES } from '../data/exercises.js';
-import { suggestNext, historyFor, doneSets, sessionBestE1rm, tonnage, loadOptions, fmtLoad, bodyweight } from '../science/strength.js';
+import { suggestNext, historyFor, doneSets, sessionBestE1rm, tonnage, loadOptions, fmtLoad, bodyweight, nextSetTarget } from '../science/strength.js';
 import { sessionLoad } from '../science/load.js';
 import { absorbLoadOnly } from '../science/garmin.js';
 import { assess, adjustSuggestion, LEVELS } from '../science/readiness.js';
@@ -143,15 +143,30 @@ function renderDraft(root, ctx) {
     const rows = h('div', { class: 'sets' },
       h('div', { class: 'set-row set-head' }, h('span', {}, 'Satz'), h('span', { title: def.bw ? 'Zusatzgewicht zum Körpergewicht, minus = Unterstützung' : '' }, def.bw ? '+kg' : 'kg'), h('span', {}, 'Wdh.'), h('span', {}, 'RIR'), h('span', {}, '')));
     ex.sets.forEach((st, si) => {
-      const row = h('div', { class: `set-row ${st.done ? 'done' : ''}` },
+      const row = h('div', { class: `set-row ${st.done ? 'done' : ''}${!st.done && st.auto ? ' auto' : ''}` },
         h('button', { class: 'set-no', 'aria-label': `Satz ${si + 1} löschen`, onclick: () => {
           save((x) => x.exercises[ei].sets.splice(si, 1)); ctx.rerender(); } }, String(si + 1)),
-        numInput(st.w, (v) => save((x) => { x.exercises[ei].sets[si].w = v; }), { decimal: true, label: def.bw ? 'Zusatzgewicht in kg' : 'Gewicht in kg', step: 0.5, placeholder: def.bw ? '0' : '' }),
-        numInput(st.reps, (v) => save((x) => { x.exercises[ei].sets[si].reps = v; }), { label: 'Wiederholungen', step: 1 }),
-        numInput(st.rir, (v) => save((x) => { x.exercises[ei].sets[si].rir = v; }), { label: 'Wiederholungen in Reserve', step: 1, min: 0, max: 10 }),
+        numInput(st.w, (v) => save((x) => { x.exercises[ei].sets[si].w = v; x.exercises[ei].sets[si].manual = true; }), { decimal: true, label: def.bw ? 'Zusatzgewicht in kg' : 'Gewicht in kg', step: 0.5, placeholder: def.bw ? '0' : '' }),
+        numInput(st.reps, (v) => save((x) => { x.exercises[ei].sets[si].reps = v; x.exercises[ei].sets[si].manual = true; }), { label: 'Wiederholungen', step: 1 }),
+        numInput(st.rir, (v) => save((x) => { x.exercises[ei].sets[si].rir = v; x.exercises[ei].sets[si].manual = true; }), { label: 'Wiederholungen in Reserve', step: 1, min: 0, max: 10 }),
         h('button', { class: `check ${st.done ? 'on' : ''}`, 'aria-pressed': String(!!st.done), 'aria-label': 'Satz erledigt', onclick: () => {
           const nowDone = !ctx.store.profile().draft.exercises[ei].sets[si].done;
-          save((x) => { x.exercises[ei].sets[si].done = nowDone; });
+          save((x) => {
+            const e = x.exercises[ei];
+            e.sets[si].done = nowDone;
+            if (!nowDone) return;
+            // Folgesätze aus dem gerade bestätigten Satz neu planen (überschreibt die Vorplanung,
+            // aber nicht, was du bei einem offenen Satz selbst eingetragen hast)
+            const lvlNow = tagesform(ctx.store.profile());
+            const t = nextSetTarget(ctx.store.profile(), e.exId, e.sets[si], { rirTarget: sug.rir, allowUp: lvlNow === 'gruen' || lvlNow === 'unbekannt' });
+            if (!t) return;
+            let changed = 0;
+            e.sets.forEach((nx, ni) => {
+              if (ni <= si || nx.done || nx.manual) return;
+              nx.w = t.w; nx.reps = t.reps; nx.rir = t.rir; nx.auto = true; changed++;
+            });
+            if (changed) e.live = { afterSet: si + 1, kind: t.kind, text: t.text };
+          });
           if (nowDone) startRest(rest);
           ctx.rerender();
         } }, '✓'));
@@ -162,7 +177,8 @@ function renderDraft(root, ctx) {
         h('div', {}, h('h3', { class: 'card-title' }, def.name),
           h('div', { class: 'muted small' }, def.p.map((m) => MUSCLES[m]).join(', '))),
         h('button', { class: 'icon-btn', 'aria-label': 'Übungsoptionen', onclick: () => exMenu(ctx, ei) }, '⋯')),
-      h('div', { class: `hint ${sug.kind}` }, sug.text),
+      ex.live ? h('div', { class: `hint ${ex.live.kind}` }, h('strong', {}, `Angepasst nach Satz ${ex.live.afterSet}: `), ex.live.text) : h('div', { class: `hint ${sug.kind}` }, sug.text),
+      ex.live ? h('details', { class: 'details' }, h('summary', {}, 'Ursprüngliche Planung'), h('p', { class: 'muted small' }, sug.text)) : null,
       def.bw ? h('div', { class: 'muted small' }, bodyweight(p) ? `Rechnet mit ${String(bodyweight(p)).replace('.', ',')} kg Körpergewicht (Profil).` : 'Körpergewicht fehlt im Profil, gerechnet wird vorerst mit 75 kg.') : null,
       sug.loads ? h('div', { class: 'muted small' }, `Stufen: ${sug.loads.slice(0, 8).map((x) => String(x).replace('.', ',')).join(' – ')} kg`) : null,
       last ? h('div', { class: 'muted small' }, `Zuletzt (${fmtDate(last.date, false)}): `,
