@@ -27,12 +27,13 @@ export function s(tag, attrs = {}, ...children) {
   return el;
 }
 
-export function toast(msg) {
+export function toast(msg, action = null) {
   document.querySelectorAll('.toast').forEach((x) => x.remove()); // nie zwei Meldungen übereinander
-  const t = h('div', { class: 'toast', role: 'status' }, msg);
+  const t = h('div', { class: `toast${action ? ' has-action' : ''}`, role: 'status' }, h('span', {}, msg),
+    action ? h('button', { type: 'button', class: 'toast-btn', onclick: () => { action.fn(); t.remove(); } }, action.label) : null);
   document.body.append(t);
   requestAnimationFrame(() => t.classList.add('show'));
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2600);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, action ? 5000 : 2600);
 }
 
 // Bottom-Sheet als Dialog-Ersatz (alert/confirm sind in manchen Umgebungen blockiert)

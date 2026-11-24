@@ -33,13 +33,39 @@ function ensure(p) {
   return p.nutrition;
 }
 
-// ---------- Vorlagen (vorgefertigte Essensauswahl)
-function addPreset(ctx, date, pr, qty = 1) {
+// ---------- Einträge
+const presetEntry = (pr, qty = 1) => {
   const r = (v) => Math.round(n(v) * qty * 10) / 10;
-  const entry = { id: uid(), name: qty === 1 ? pr.name : `${qty} × ${pr.name}`, kcal: Math.round(n(pr.kcal) * qty), p: r(pr.p), c: r(pr.c), f: r(pr.f), presetId: pr.id };
+  return { id: uid(), name: qty === 1 ? pr.name : `${fmt(qty, 1)} × ${pr.name}`, kcal: Math.round(n(pr.kcal) * qty), p: r(pr.p), c: r(pr.c), f: r(pr.f), presetId: pr.id };
+};
+function pushEntry(ctx, date, entry) {
   ctx.store.updateProfile((x) => { const d = ensure(x).days; (d[date] = d[date] || []).push(entry); });
-  toast(`${entry.name}: ${fmt(entry.kcal)} kcal, ${fmt(entry.p)} g Eiweiß eingetragen.`);
+  try { navigator.vibrate && navigator.vibrate(8); } catch (e) {}
+}
+function removeEntries(ctx, date, ids) {
+  ctx.store.updateProfile((x) => { const d = ensure(x).days; d[date] = (d[date] || []).filter((y) => !ids.includes(y.id)); if (!d[date].length) delete d[date]; });
+}
+function restoreEntries(ctx, date, list) {
+  ctx.store.updateProfile((x) => { const d = ensure(x).days; d[date] = [...(d[date] || []), ...list]; });
+}
+// Für die Startseite (dort wird danach neu gezeichnet)
+function addPreset(ctx, date, pr, qty = 1) {
+  const entry = presetEntry(pr, qty);
+  pushEntry(ctx, date, entry);
+  toast(`${entry.name} eingetragen.`, { label: 'Rückgängig', fn: () => { removeEntries(ctx, date, [entry.id]); ctx.rerender(); } });
   ctx.rerender();
+}
+
+// Gleiche Einträge zusammenfassen (z. B. zweimal dasselbe Gericht)
+const groupKey = (e) => (e.presetId ? `p:${e.presetId}` : `n:${e.name}|${e.kcal}|${e.g || ''}`);
+function groupEntries(entries) {
+  const map = new Map();
+  for (const e of entries) {
+    const k = groupKey(e);
+    if (!map.has(k)) map.set(k, { key: k, items: [] });
+    map.get(k).items.push(e);
+  }
+  return [...map.values()];
 }
 
 const standardBreakfast = (p) => ensure(p).presets.find((x) => x.standard) || ensure(p).presets.find((x) => x.cat === 'fruehstueck');
@@ -52,33 +78,59 @@ function breakfastButton(ctx, date, small = false) {
     done ? `${pr.name} nochmal eintragen` : `${pr.name} eintragen (${fmt(pr.kcal)} kcal, ${fmt(pr.p)} g Eiweiß)`);
 }
 
-// Schnellauswahl: Reiter pro Kategorie und Suche, damit auch lange Listen übersichtlich bleiben
+// Auswahl: Reiter pro Kategorie und Suche. Ein Tipp auf + trägt eine Portion ein, ohne dass die Seite springt.
 let quickCat = 'gericht';
-function quickCard(ctx, date) {
+function quickCard(ctx, date, live) {
   const nu = ensure(ctx.profile);
   const cats = Object.keys(CATS).filter((cat) => nu.presets.some((x) => x.cat === cat && !x.standard));
   if (!cats.includes(quickCat)) quickCat = cats[0];
   let q = '';
   let all = false;
   const tabs = h('div', { class: 'seg' });
-  const list = h('div', { class: 'pick-list' });
+  const list = h('div', { class: 'meal-list' });
+  const counts = () => {
+    const c = {};
+    for (const e of (ensure(ctx.profile).days[date] || [])) if (e.presetId) c[e.presetId] = (c[e.presetId] || 0) + 1;
+    return c;
+  };
+  const row = (pr, cnt) => {
+    const minus = () => {
+      const last = [...(ensure(ctx.profile).days[date] || [])].reverse().find((e) => e.presetId === pr.id);
+      if (last) { removeEntries(ctx, date, [last.id]); live.refresh(); }
+    };
+    const plus = () => { pushEntry(ctx, date, presetEntry(pr)); live.refresh(pr.id); };
+    return h('div', { class: `pick-row${cnt ? ' on' : ''}`, 'data-id': pr.id },
+      h('span', { class: 'pick-name' }, pr.name, h('span', { class: 'muted small block' }, `${fmt(pr.kcal)} kcal | ${fmt(pr.p)} g Eiweiß`)),
+      cnt ? h('span', { class: 'stepper' },
+        h('button', { type: 'button', class: 'step-btn', 'aria-label': `Eine Portion ${pr.name} weniger`, onclick: minus }, '−'),
+        h('span', { class: 'step-count', 'aria-live': 'polite' }, `${cnt}×`),
+        h('button', { type: 'button', class: 'step-btn plus', 'aria-label': `Eine Portion ${pr.name} mehr`, onclick: plus }, '+'))
+        : h('button', { type: 'button', class: 'add-btn', 'aria-label': `${pr.name} eintragen`, onclick: plus }, '+'));
+  };
   const draw = () => {
     tabs.replaceChildren(...cats.map((cat) => h('button', { type: 'button', class: `seg-btn ${!q && cat === quickCat ? 'active' : ''}`,
       onclick: () => { quickCat = cat; q = ''; all = false; search.value = ''; draw(); } }, CATS[cat])));
-    const items = nu.presets.filter((x) => !x.standard && (q ? x.name.toLowerCase().includes(q.toLowerCase()) : x.cat === quickCat))
+    const c = counts();
+    const items = nu.presets.filter((x) => (q ? x.name.toLowerCase().includes(q.toLowerCase()) : x.cat === quickCat && !x.standard))
       .sort((x, y) => x.name.localeCompare(y.name, 'de'));
     const LIMIT = 8;
     const shown = q || all ? items : items.slice(0, LIMIT);
-    list.replaceChildren(...(items.length ? shown.map((pr) => h('button', { type: 'button', class: 'pick-row', onclick: () => addPreset(ctx, date, pr) },
-      h('span', { class: 'pick-name' }, pr.name),
-      h('span', { class: 'pick-kcal' }, `${fmt(pr.kcal)} kcal`, h('span', { class: 'muted small block' }, `${fmt(pr.p)} g E`)),
-      h('span', { class: 'pick-plus', 'aria-hidden': 'true' }, '+'))) : [h('p', { class: 'muted small' }, 'Nichts gefunden. Unten bei „Meine Vorlagen“ kannst du neue Gerichte anlegen.')]),
+    list.replaceChildren(...(items.length ? shown.map((pr) => row(pr, c[pr.id] || 0)) : [h('p', { class: 'muted small' }, 'Nichts gefunden. Unten bei „Meine Vorlagen“ kannst du neue Gerichte anlegen.')]),
       ...(shown.length < items.length ? [h('button', { type: 'button', class: 'btn ghost small full', onclick: () => { all = true; draw(); } }, `Alle ${items.length} anzeigen`)] : []));
   };
-  const search = h('input', { type: 'search', placeholder: 'Gericht suchen, z. B. Lachs', 'aria-label': 'Vorlagen durchsuchen', oninput: (e) => { q = e.target.value.trim(); draw(); } });
+  const search = h('input', { type: 'search', placeholder: 'Suchen, z. B. Lachs', 'aria-label': 'Gerichte durchsuchen', oninput: (e) => { q = e.target.value.trim(); draw(); } });
   draw();
-  return card('Schnellauswahl', breakfastButton(ctx, date), search, tabs, list,
-    h('p', { class: 'muted small' }, 'Ein Tipp trägt eine Portion ein. Gerichte sind auf 4 Portionen ausgelegt, die Werte gelten für eine. Falsch getippt? Unten bei „Eingetragen“ entfernen.'));
+  const std = standardBreakfast(ctx.profile);
+  const bf = h('div', {});
+  const drawBf = () => {
+    const done = std && (ensure(ctx.profile).days[date] || []).some((e) => e.presetId === std.id);
+    bf.replaceChildren(...(std && !done ? [h('button', { type: 'button', class: 'btn primary full', onclick: () => { pushEntry(ctx, date, presetEntry(std)); live.refresh(std.id); } },
+      `${std.name} eintragen (${fmt(std.kcal)} kcal)`)] : []));
+  };
+  drawBf();
+  live.onChange.push(() => { draw(); drawBf(); });
+  return card('Essen hinzufügen', bf, search, tabs, list,
+    h('p', { class: 'muted small' }, 'Gerichte sind auf 4 Portionen ausgelegt, die Werte gelten für eine.'));
 }
 
 function presetForm(pr, onSave) {
@@ -150,13 +202,13 @@ function macroBar(label, eaten, target, extra) {
     h('div', { class: 'macro-track' }, h('div', { class: `macro-fill ${eaten > target * 1.1 ? 'over' : ''}`, style: { width: `${pct}%` } })));
 }
 
-function addSheet(ctx, date) {
+function addSheet(ctx, date, live) {
   const p = ctx.profile;
   const nu = ensure(p);
   const add = (entry) => {
-    ctx.store.updateProfile((x) => { const d = ensure(x).days; (d[date] = d[date] || []).push({ id: uid(), ...entry }); });
+    pushEntry(ctx, date, { id: uid(), ...entry });
     toast(`${entry.name}: ${fmt(entry.kcal)} kcal eingetragen.`);
-    ctx.rerender();
+    live.refresh();
   };
   sheet(`Essen eintragen: ${fmtDate(date)}`, (close) => {
     let mode = 'vorlagen';
@@ -188,7 +240,7 @@ function addSheet(ctx, date) {
               return h('div', { class: 'food-row' },
                 h('div', {}, h('strong', {}, pr.name), h('div', { class: 'muted small' }, `${fmt(pr.kcal)} kcal | E ${fmt(pr.p, 1)} | K ${fmt(pr.c, 1)} | F ${fmt(pr.f, 1)}`)),
                 h('div', { class: 'row gap' }, q, h('span', { class: 'muted small' }, '×'),
-                  h('button', { type: 'button', class: 'btn primary small', onclick: () => { addPreset(ctx, date, pr, n(qty) || 1); close(); } }, '+')));
+                  h('button', { type: 'button', class: 'btn primary small', onclick: () => { const e = presetEntry(pr, n(qty) || 1); pushEntry(ctx, date, e); toast(`${e.name} eingetragen.`); live.refresh(); close(); } }, '+')));
             })));
         }
       } else if (mode === 'liste') {
@@ -347,43 +399,88 @@ function render(root, ctx) {
     h('button', { class: 'icon-btn', 'aria-label': 'Folgetag', disabled: date >= today, onclick: () => go(ymd(addDays(parseYmd(date), 1))) }, '›')));
 
   const need = dayNeed(p, date);
-  const entries = p.nutrition.days[date] || [];
-  const eaten = sumDay(entries);
+  const tg = need.ready ? targets(p, need) : null;
+  const sess = p.sessions.filter((s) => s.date && s.date.slice(0, 10) === date);
+  const live = { onChange: [], refresh: null };
+  // Zuletzt angetipptes Element merken (iOS gibt Knöpfen beim Tippen keinen Fokus)
+  let lastTap = null;
+  root.addEventListener('pointerdown', (e) => { lastTap = e.target; }, true);
 
-  if (!need.ready) {
-    root.append(card('Bedarf', h('p', { class: 'muted small' }, `Damit die App Ruhe- und Belastungsbedarf rechnen kann, fehlt noch: ${need.missing}.`)));
-    root.append(basicsCard(ctx, true));
-  } else {
-    const tg = targets(p, need);
+  // Übersicht: Bilanz und Makros, wird bei jeder Änderung neu gefüllt
+  const summary = h('section', { class: 'card' });
+  const drawSummary = () => {
+    const eaten = sumDay(p.nutrition.days[date] || []);
+    if (!need.ready) {
+      summary.replaceChildren(h('h2', { class: 'card-title' }, 'Heute gegessen'),
+        h('div', { class: 'kcal-big' }, h('strong', {}, fmt(eaten.kcal)), h('span', { class: 'muted' }, ' kcal')),
+        h('p', { class: 'muted small' }, `Für Bedarf und Ziele fehlt noch: ${need.missing}.`));
+      return;
+    }
     const bal = balance(eaten.kcal, need, tg);
-    const sess = p.sessions.filter((s) => s.date && s.date.slice(0, 10) === date);
-    root.append(card('Kalorienbilanz',
-      h('div', { class: 'kcal-big' }, h('strong', {}, fmt(eaten.kcal)), h('span', { class: 'muted' }, ' kcal gegessen'),
+    summary.replaceChildren(h('h2', { class: 'card-title' }, 'Kalorienbilanz'),
+      h('div', { class: 'kcal-big' }, h('strong', {}, fmt(eaten.kcal)), h('span', { class: 'muted' }, ` von ${fmt(tg.kcalLow)} bis ${fmt(tg.kcalHigh)} kcal`),
         bal ? h('span', { class: 'kcal-badge' }, badge(bal.level, `${bal.label}, ${bal.diff > 0 ? '+' : ''}${fmt(bal.diff)} kcal`)) : null),
       scale(eaten.kcal, need, tg),
-      h('div', { class: 'stats' },
-        h('div', { class: 'stat' }, h('div', { class: 'stat-label' }, 'Ruhebedarf'), h('div', { class: 'stat-value' }, fmt(need.bmr)), h('div', { class: 'stat-sub' }, 'Grundumsatz')),
-        h('div', { class: 'stat' }, h('div', { class: 'stat-label' }, 'Belastungsbedarf'), h('div', { class: 'stat-value' }, fmt(need.total)),
-          h('div', { class: 'stat-sub' }, `Alltag ${fmt(need.daily)} + Training ${fmt(need.training)}`))),
-      h('p', { class: 'muted small' }, `Ziel für ${GOAL_TEXT(p)}: ${tg.band.label}, also ${fmt(tg.kcalLow)} bis ${fmt(tg.kcalHigh)} kcal (grüner Bereich).`),
-      sess.length ? h('details', { class: 'details' }, h('summary', {}, `Training an diesem Tag (${sess.length})`),
-        sess.map((s) => h('p', { class: 'small' }, `${s.type === 'kraft' ? (s.name || 'Krafttraining') : (SPORTS[s.sport]?.label || s.sport)}, ${fmt(s.durationMin)} min: ${fmt(sessionKcal(p, s, need.bmr))} kcal ${s.kcal ? '(Garmin)' : '(geschätzt)'}`))) : null));
-
-    root.append(card('Makros',
       macroBar('Eiweiß', eaten.p, tg.protein, p.body.weightKg ? `(${fmt(eaten.p / n(p.body.weightKg), 1)} g/kg)` : ''),
       macroBar('Kohlenhydrate', eaten.c, tg.carbs),
-      macroBar('Fett', eaten.f, tg.fat)));
-  }
+      macroBar('Fett', eaten.f, tg.fat),
+      h('details', { class: 'details' }, h('summary', {}, 'Bedarf im Detail'),
+        h('div', { class: 'stats' },
+          h('div', { class: 'stat' }, h('div', { class: 'stat-label' }, 'Ruhebedarf'), h('div', { class: 'stat-value' }, fmt(need.bmr)), h('div', { class: 'stat-sub' }, 'Grundumsatz')),
+          h('div', { class: 'stat' }, h('div', { class: 'stat-label' }, 'Belastungsbedarf'), h('div', { class: 'stat-value' }, fmt(need.total)),
+            h('div', { class: 'stat-sub' }, `Alltag ${fmt(need.daily)} + Training ${fmt(need.training)}`))),
+        h('p', { class: 'muted small' }, `Ziel für ${GOAL_TEXT(p)}: ${tg.band.label}, also ${fmt(tg.kcalLow)} bis ${fmt(tg.kcalHigh)} kcal (grüner Bereich).`),
+        ...sess.map((s) => h('p', { class: 'small' }, `${s.type === 'kraft' ? (s.name || 'Krafttraining') : (SPORTS[s.sport]?.label || s.sport)}, ${fmt(s.durationMin)} min: ${fmt(sessionKcal(p, s, need.bmr))} kcal ${s.kcal ? '(Garmin)' : '(geschätzt)'}`))));
+  };
 
-  root.append(quickCard(ctx, date));
-  root.append(h('button', { class: 'btn ghost full big', onclick: () => addSheet(ctx, date) }, '+ Andere Menge oder Lebensmittel'));
+  // Gegessen: gleiche Einträge zusammengefasst, mit − und + und Entfernen (mit Rückgängig)
+  const eatenCard = h('section', { class: 'card' });
+  const drawEaten = (flashId) => {
+    const entries = p.nutrition.days[date] || [];
+    const groups = groupEntries(entries);
+    const presets = ensure(p).presets;
+    eatenCard.replaceChildren(h('h2', { class: 'card-title' }, date === today ? 'Heute gegessen' : 'Gegessen', entries.length ? h('span', { class: 'muted small' }, `  ${entries.length} ${entries.length === 1 ? 'Eintrag' : 'Einträge'}`) : null),
+      ...(groups.length ? groups.map((g) => {
+        const e = g.items[0];
+        const cnt = g.items.length;
+        const sum = sumDay(g.items);
+        const pr = e.presetId ? presets.find((x) => x.id === e.presetId) : null;
+        const plus = () => { pushEntry(ctx, date, pr ? presetEntry(pr) : { ...e, id: uid() }); live.refresh(e.presetId); };
+        const minus = () => { removeEntries(ctx, date, [g.items[cnt - 1].id]); live.refresh(); };
+        const drop = () => {
+          const gone = g.items;
+          removeEntries(ctx, date, gone.map((x) => x.id)); live.refresh();
+          toast(`${e.name} entfernt.`, { label: 'Rückgängig', fn: () => { restoreEntries(ctx, date, gone); live.refresh(); } });
+        };
+        return h('div', { class: `eat-row${flashId && e.presetId === flashId ? ' flash' : ''}` },
+          h('span', { class: 'eat-main' }, h('strong', {}, e.name, e.g ? ` (${fmt(e.g)} g)` : ''),
+            h('span', { class: 'muted small block' }, `${fmt(sum.kcal)} kcal | E ${fmt(sum.p)} g | K ${fmt(sum.c)} g | F ${fmt(sum.f)} g`)),
+          h('span', { class: 'stepper' },
+            h('button', { type: 'button', class: 'step-btn', 'aria-label': `${e.name}: eine weniger`, onclick: cnt > 1 ? minus : drop }, '−'),
+            h('span', { class: 'step-count' }, `${cnt}×`),
+            h('button', { type: 'button', class: 'step-btn plus', 'aria-label': `${e.name}: eine mehr`, onclick: plus }, '+')),
+          cnt > 1 ? h('button', { type: 'button', class: 'eat-drop', onclick: drop }, 'alle entfernen') : null);
+      }) : [empty('Noch nichts eingetragen. Wähle unten ein Gericht aus.')]));
+  };
 
-  root.append(card(`Eingetragen (${entries.length})`, entries.length ? entries.map((e) => h('div', { class: 'list-item static' },
-    h('span', {}, h('strong', {}, e.name, e.g ? ` (${fmt(e.g)} g)` : ''),
-      h('span', { class: 'muted small block' }, `${fmt(e.kcal)} kcal | E ${fmt(e.p, 1)} | K ${fmt(e.c, 1)} | F ${fmt(e.f, 1)}`)),
-    h('button', { class: 'icon-btn', 'aria-label': `${e.name} löschen`, onclick: () => confirmSheet(`„${e.name}“ entfernen?`, '', 'Entfernen', () => {
-      ctx.store.updateProfile((x) => { const d = ensure(x).days; d[date] = (d[date] || []).filter((y) => y.id !== e.id); if (!d[date].length) delete d[date]; }); ctx.rerender(); }) }, '✕')))
-    : empty('Noch nichts eingetragen.')));
+  live.refresh = (flashId) => {
+    const anchor = lastTap && lastTap.isConnected ? lastTap.closest('.pick-row, .eat-row, .card') : null;
+    const id = anchor && anchor.dataset.id;
+    const inPick = anchor && anchor.closest('.meal-list');
+    const before = anchor ? anchor.getBoundingClientRect().top : null;
+    drawSummary(); drawEaten(flashId); live.onChange.forEach((fn) => fn());
+    if (before !== null && inPick) {
+      const now = (id && root.querySelector(`.meal-list .pick-row[data-id="${id}"]`)) || quick;
+      window.scrollBy(0, now.getBoundingClientRect().top - before);
+    }
+  };
+  drawSummary();
+  drawEaten();
+  root.append(summary, eatenCard);
+  const quick = quickCard(ctx, date, live);
+  root.append(quick);
+  root.append(h('button', { class: 'btn ghost full', onclick: () => addSheet(ctx, date, live) }, '+ Andere Menge, Lebensmittel oder frei eintippen'));
+  if (!need.ready) root.append(basicsCard(ctx, true));
 
   if (need.ready) root.append(weekCard(p, date));
   root.append(presetsCard(ctx, date));
