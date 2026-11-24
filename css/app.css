@@ -387,3 +387,11 @@ code { font-size: 0.92em; background: var(--surface-2); padding: 1px 5px; border
 @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
 .toast.has-action { display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left; min-width: 280px; }
 .toast-btn { background: none; border: 0; color: var(--accent-ink); font-weight: 700; font-size: 14px; padding: 6px 4px; white-space: nowrap; }
+
+/* Garmin-Import */
+.file-btn { position: relative; display: flex; align-items: center; justify-content: center; margin-top: 10px; cursor: pointer; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }
+.import-status { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; border-left: 3px solid var(--muted); background: var(--bg); }
+.import-status.good { border-left-color: var(--good); }
+.import-status.warning { border-left-color: var(--warning); }
+.import-status.serious { border-left-color: var(--serious); }
