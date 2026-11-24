@@ -61,8 +61,8 @@ function tagesformCard(ctx) {
         rest.length ? h('div', { class: 'tf-sub' }, rest.join(': ')) : null),
       h('div', { class: 'tf-src muted small' }, r.manual ? 'selbst eingestuft' : r.date ? `Garmin ${fmtDate(r.date, false)}` : '')),
     h('div', { class: 'tf-advice' }, advice(r.level).map((t) => h('p', { class: 'small' }, t))),
-    needImport ? h('button', { class: 'btn primary full', onclick: () => ctx.go('garmin') }, r.stale ? 'Neue Garmin-Daten importieren' : 'Garmin-Daten importieren') : null,
     rows,
+    h('button', { class: `btn ${needImport ? 'primary' : 'ghost'} full`, onclick: () => ctx.go('garmin') }, '↻ Garmin-Daten importieren'),
     h('details', { class: 'details' }, h('summary', {}, 'Warum diese Einstufung?'),
       r.signals.length ? h('ul', { class: 'hints' }, r.signals.map((x) => h('li', {}, badge(x.points === 0 ? 'good' : x.points === 1 ? 'warning' : 'serious', ''), h('span', {}, x.text)))) : h('p', { class: 'small' }, r.reason || ''),
       rows ? h('p', { class: 'muted small' }, 'Verläufe der letzten 14 Tage. Graues Band = dein Normalbereich, Linie beim Schlaf = 7 h. Tippe auf einen Verlauf für den Tageswert.') : null,
@@ -73,7 +73,6 @@ function tagesformCard(ctx) {
         h('button', { class: 'chip', onclick: () => setOverride('rot') }, 'Rot'),
         r.manual ? h('button', { class: 'chip', onclick: () => setOverride(null) }, 'Automatisch') : null),
       h('div', { class: 'row gap wrap' },
-        !needImport ? h('button', { class: 'btn ghost small', onclick: () => ctx.go('garmin') }, 'Garmin-Daten aktualisieren') : null,
         h('a', { class: 'ref small', href: '#wissen' }, 'Wie wird das berechnet?'))));
 }
 
