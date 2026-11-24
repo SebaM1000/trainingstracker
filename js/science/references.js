@@ -30,11 +30,11 @@ export const REFS = {
   },
   hickmott2022: {
     cite: 'Hickmott LM, Chilibeck PD, Shaw KA, Butcher SJ (2022). The effect of load and volume autoregulation on muscular strength and hypertrophy: a systematic review and meta-analysis. Sports Medicine – Open 8, 9.',
-    note: 'Lastanpassung nach RIR/RPE oder Geschwindigkeit wirkt auf Kraft ähnlich gut wie feste Prozentvorgaben, mit leichtem Trend zugunsten der Anpassung.',
+    use: 'Satz-Anpassung im Training: Lastanpassung nach RIR/RPE oder Geschwindigkeit wirkt auf Kraft ähnlich gut wie feste Prozentvorgaben, mit leichtem Trend zugunsten der Anpassung.',
   },
   zhang2021: {
     cite: 'Zhang X, Li H, Bi S, Luo Y, Cao Y, Zhang G (2021). Auto-regulation method vs. fixed-loading method in maximum strength training for athletes: a systematic review and meta-analysis. Frontiers in Physiology 12, 651112.',
-    note: 'Bei trainierten Sportlern brachte Autoregulation (APRE, RPE, Geschwindigkeit) mehr Maximalkraft als feste Lasten.',
+    use: 'Satz-Anpassung im Training: Bei trainierten Sportlern brachte Autoregulation (APRE, RPE, Geschwindigkeit) mehr Maximalkraft als feste Lasten.',
   },
   epley1985: {
     cite: 'Epley B (1985). Poundage chart. Boyd Epley Workout. Lincoln, NE. Erweiterung um RIR: e1RM = Last × (1 + (Wdh + RIR)/30).',
