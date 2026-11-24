@@ -16,10 +16,10 @@ function ensure(p) {
   p.nutrition.settings = { ...DEFAULT_SETTINGS, ...(p.nutrition.settings || {}) };
   if (!p.nutrition.presets) { p.nutrition.presets = DEFAULT_PRESETS.map((x) => ({ id: uid(), ...x })); p.nutrition.presetsVersion = PRESETS_VERSION; }
   if ((p.nutrition.presetsVersion || 1) < PRESETS_VERSION) {
-    // Standard-Frühstück auf die neuen Werte bringen, solange es nicht von Hand geändert wurde (alter Wert 869 kcal)
+    // Standard-Frühstück auf die neuen Werte bringen, solange es nicht von Hand geändert wurde (frühere Werte 869 und 884 kcal)
     const std = p.nutrition.presets.find((x) => x.key === 'std-fruehstueck');
     const neu = DEFAULT_PRESETS.find((x) => x.key === 'std-fruehstueck');
-    if (std && std.kcal === 869) Object.assign(std, { kcal: neu.kcal, p: neu.p, c: neu.c, f: neu.f, note: neu.note });
+    if (std && [869, 884].includes(std.kcal)) Object.assign(std, { kcal: neu.kcal, p: neu.p, c: neu.c, f: neu.f, note: neu.note });
     // Lahmacun von mager auf normales Hack umgestellt (nur wenn noch unverändert)
     const lah = p.nutrition.presets.find((x) => x.key === 'g-protein-lahmacun' && x.kcal === 1080);
     const lahNeu = DEFAULT_PRESETS.find((x) => x.key === 'g-protein-lahmacun');
