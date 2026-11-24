@@ -226,7 +226,7 @@ export function nextSetTarget(profile, exId, set, { rirTarget, allowUp = true } 
     const reps = allowUp ? Math.min(EXT_MAX, Math.max(same, p.repMax)) : p.repMax;
     return { w, reps, rir: rirT, kind: 'reps', text: allowUp
       ? `${why} hatte Reserve. Die nächste Stufe (${lbl(nw)}) wäre zu viel, also Wiederholungen steigern: ${reps} Wdh. bei ca. ${rirT} RIR.`
-      : `${why} lief leicht, wegen der Tagesform bleibt das Gewicht: ${reps} Wdh. bei ca. ${rirT} RIR.` };
+      : `${why} lief leicht, wegen der roten Tagesform bleibt das Gewicht: ${reps} Wdh. bei ca. ${rirT} RIR.` };
   }
   if (same < p.repMin) {
     // so weit runter, dass das untere Ende des Bereichs wieder bei Ziel-RIR machbar ist

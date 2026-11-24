@@ -158,7 +158,7 @@ function renderDraft(root, ctx) {
             // Folgesätze aus dem gerade bestätigten Satz neu planen (überschreibt die Vorplanung,
             // aber nicht, was du bei einem offenen Satz selbst eingetragen hast)
             const lvlNow = tagesform(ctx.store.profile());
-            const t = nextSetTarget(ctx.store.profile(), e.exId, e.sets[si], { rirTarget: sug.rir, allowUp: lvlNow === 'gruen' || lvlNow === 'unbekannt' });
+            const t = nextSetTarget(ctx.store.profile(), e.exId, e.sets[si], { rirTarget: sug.rir, allowUp: lvlNow !== 'rot' });
             if (!t) return;
             let changed = 0;
             e.sets.forEach((nx, ni) => {
