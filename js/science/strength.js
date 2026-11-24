@@ -214,14 +214,16 @@ export function nextSetTarget(profile, exId, set, { rirTarget, allowUp = true } 
   const same = repsAt(w);
   const why = `Satz mit ${lbl(w)} × ${r}${num(set.rir) !== null ? ` bei ${rir} RIR` : ''}`;
 
-  if (same > p.repMax) {
+  // Doppelte Progression: Ist das obere Ende erreicht (bei Ziel-RIR) oder wurde es tatsächlich
+  // überschritten, geht das Gewicht hoch, statt die Wiederholungen immer weiter zu steigern.
+  if (same >= p.repMax || r > p.repMax) {
     const nw = up(w);
     const rn = repsAt(nw);
     if (allowUp && nw > w && rn >= p.repMin) {
       const reps = Math.min(p.repMax, rn);
-      return { w: nw, reps, rir: rirT, kind: 'up', text: `${why} hatte Reserve: nächster Satz ${lbl(nw)} × ${reps} bei ca. ${rirT} RIR.` };
+      return { w: nw, reps, rir: rirT, kind: 'up', text: `${why}: oberes Ende erreicht, nächster Satz ${lbl(nw)} × ${reps} bei ca. ${rirT} RIR.` };
     }
-    const reps = allowUp ? Math.min(EXT_MAX, same) : p.repMax;
+    const reps = allowUp ? Math.min(EXT_MAX, Math.max(same, p.repMax)) : p.repMax;
     return { w, reps, rir: rirT, kind: 'reps', text: allowUp
       ? `${why} hatte Reserve. Die nächste Stufe (${lbl(nw)}) wäre zu viel, also Wiederholungen steigern: ${reps} Wdh. bei ca. ${rirT} RIR.`
       : `${why} lief leicht, wegen der Tagesform bleibt das Gewicht: ${reps} Wdh. bei ca. ${rirT} RIR.` };
