@@ -129,7 +129,9 @@ export function exportJSON(onlyActive = false) {
     ? { ...emptyState(), activeProfileId: state.activeProfileId,
         profiles: { [state.activeProfileId]: profile() } }
     : state;
-  return JSON.stringify({ app: 'trainingstracker', exportedAt: new Date().toISOString(), data }, null, 2);
+  // Zugangsschlüssel (z. B. für den GitHub-Abruf) gehören nicht ins Backup
+  const strip = (k, v) => (k === 'github' && v && typeof v === 'object' && 'token' in v ? undefined : v);
+  return JSON.stringify({ app: 'trainingstracker', exportedAt: new Date().toISOString(), data }, strip, 2);
 }
 
 export function importJSON(text, mode = 'merge') {

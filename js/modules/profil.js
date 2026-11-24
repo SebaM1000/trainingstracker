@@ -4,6 +4,7 @@ import { ICONS } from '../core/icons.js';
 import { GOALS, PARAM_META, defaultParamsFor } from '../science/goals.js';
 import { hrMax } from '../science/endurance.js';
 import { ymd } from '../core/dates.js';
+import { fetchRemote, remoteConfigured, fmtStand, autoImport } from '../core/garminRemote.js';
 
 function onboarding(root, ctx) {
   const d = { name: '', goal: 'hypertrophie' };
@@ -133,7 +134,8 @@ function render(root, ctx) {
 
   if (p.settings.modules.garmin !== false) root.append(card('Garmin',
     h('p', { class: 'muted small' }, 'Ausdauereinheiten aus deiner Garmin-Uhr übernehmen und die Anstrengung nachtragen.'),
-    h('button', { class: 'btn ghost full', onclick: () => ctx.go('garmin') }, 'Garmin-Import öffnen')));
+    h('button', { class: 'btn ghost full', onclick: () => ctx.go('garmin') }, 'Garmin-Import öffnen'),
+    githubBox(ctx)));
 
   // Backup
   root.append(card('Datensicherung',
@@ -149,3 +151,38 @@ function render(root, ctx) {
 }
 
 export default { id: 'profil', title: 'Profil', icon: ICONS.profil, order: 5, nav: true, render };
+
+// Automatischer Abruf: privates GitHub-Repository + Nur-Lese-Schlüssel
+function githubBox(ctx) {
+  const p = ctx.profile;
+  const gh = { repo: '', token: '', ...(p.settings.github || {}) };
+  const on = remoteConfigured(p);
+  const msg = h('div', { class: 'import-status', hidden: true, role: 'status' });
+  const show = (level, text) => { msg.hidden = false; msg.className = `import-status ${level}`; msg.textContent = text; };
+  const repo = h('input', { type: 'text', value: gh.repo, placeholder: 'z. B. SebaM1000/garmin-daten', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', 'aria-label': 'Repository' });
+  const token = h('input', { type: 'password', value: gh.token, placeholder: on ? 'gespeichert' : 'github_pat_…', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Lese-Schlüssel' });
+  const save = async () => {
+    const cfg = { repo: repo.value.trim(), token: token.value.trim() };
+    if (!/^[\w.-]+\/[\w.-]+$/.test(cfg.repo)) { show('serious', 'Bitte das Repository als Besitzer/Name eintragen, z. B. SebaM1000/garmin-daten.'); return; }
+    if (!cfg.token) { show('serious', 'Bitte den Lese-Schlüssel einfügen.'); return; }
+    show('info', 'Verbindung wird geprüft …');
+    try {
+      const data = await fetchRemote(cfg);
+      ctx.store.updateProfile((x) => { x.settings.github = cfg; });
+      await autoImport(ctx.store, { force: true });
+      show('good', `Verbunden. Daten mit Stand ${fmtStand(data.aktualisiert)} übernommen. Ab jetzt holt die App die Daten beim Öffnen automatisch.`);
+    } catch (e) {
+      show('serious', e.message);
+    }
+  };
+  return h('details', { class: 'details' },
+    h('summary', {}, on ? 'Automatischer Abruf: eingerichtet' : 'Automatischer Abruf einrichten'),
+    h('p', { class: 'muted small' }, 'Der PC legt data.json zusätzlich in ein privates GitHub-Repository. Mit einem Nur-Lese-Schlüssel holt die App sie beim Öffnen selbst ab, ohne Dateiauswahl. Der Schlüssel bleibt nur auf diesem Gerät.'),
+    field('Repository', repo),
+    field('Lese-Schlüssel', token),
+    h('div', { class: 'row gap wrap' },
+      h('button', { class: 'btn primary', onclick: save }, on ? 'Speichern und testen' : 'Verbinden'),
+      on ? h('button', { class: 'btn ghost', onclick: () => confirmSheet('Automatischen Abruf ausschalten?', 'Der Schlüssel wird von diesem Gerät gelöscht. Deine Daten in der App bleiben.', 'Ausschalten', () => {
+        ctx.store.updateProfile((x) => { delete x.settings.github; }); ctx.rerender(); toast('Automatischer Abruf ausgeschaltet.'); }) }, 'Ausschalten') : null),
+    msg);
+}

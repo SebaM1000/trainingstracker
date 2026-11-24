@@ -1,7 +1,8 @@
 // Einstiegspunkt: lädt Daten, registriert Module, steuert Navigation.
 import * as store from './core/store.js';
 import * as registry from './core/registry.js';
-import { h } from './core/ui.js';
+import { h, toast } from './core/ui.js';
+import { autoImport } from './core/garminRemote.js';
 
 import heute from './modules/heute.js';
 import kraft from './modules/kraft.js';
@@ -52,6 +53,7 @@ export function render() {
   main.replaceChildren(root);
   mod.render(root, { store, go, rerender: render, profile: p });
   main.scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 profileBtn.addEventListener('click', () => go('profil'));
@@ -62,6 +64,14 @@ if (store.isMemoryOnly()) {
   document.getElementById('storage-warning').hidden = false;
 }
 render();
+
+// Garmin-Daten automatisch holen (nur wenn im Profil eingerichtet)
+async function syncGarmin() {
+  const r = await autoImport(store);
+  if (r.status === 'importiert') { const y = window.scrollY; render(); window.scrollTo(0, y); toast(r.text); }
+}
+syncGarmin();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncGarmin(); });
 
 // Service Worker für Offline-Betrieb (nur bei echter Installation, z. B. GitHub Pages)
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

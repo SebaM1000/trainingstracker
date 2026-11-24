@@ -27,6 +27,7 @@ from typing import Any, Callable
 # ---------------------------------------------------------------- Pfade
 PROJECT_DIR = Path(__file__).resolve().parent
 TOKEN_DIR = PROJECT_DIR / ".garminconnect"          # privat, nie in einen Cloud-Ordner legen
+GITHUB_TOKEN_FILE = TOKEN_DIR / "github_token.txt"  # Schreibschlüssel nur für das private Daten-Repository
 LOG_DIR = PROJECT_DIR / "logs"
 CONFIG_FILE = PROJECT_DIR / "config.json"
 # Ziel für Daten, Notizen und Dashboard. Überschreibbar über config.json ("output_dir").
@@ -475,6 +476,90 @@ def merge_keep(old: dict | None, new: dict) -> dict:
     return out
 
 
+# ---------------------------------------------------------------- GitHub-Übergabe (optional)
+# Legt data.json zusätzlich in ein PRIVATES GitHub-Repository, aus dem die Trainings-App sie
+# automatisch abholt. Der Schlüssel wird nie ausgegeben oder geloggt.
+def load_config() -> dict:
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_config(cfg: dict) -> None:
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _gh_request(method: str, url: str, token: str, body: dict | None = None) -> tuple[int, dict]:
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(url, method=method, data=json.dumps(body).encode() if body else None, headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "garmin-sync"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status, json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, json.loads(e.read() or b"{}")
+        except Exception:
+            return e.code, {}
+
+
+def cmd_github_login() -> int:
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        print("Abbruch: Bitte in einem echten Terminalfenster ausführen, damit der Schlüssel verdeckt eingegeben werden kann.")
+        return 2
+    cfg = load_config()
+    default = cfg.get("github_repo", "")
+    print("GitHub-Übergabe einrichten (einmalig).\n")
+    repo = input(f"Repository (Besitzer/Name){f' [{default}]' if default else ''}: ").strip() or default
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo or ""):
+        print("Bitte im Format Besitzer/Name eingeben, z. B. SebaM1000/garmin-daten.")
+        return 1
+    token = getpass.getpass("Schreib-Schlüssel (unsichtbare Eingabe): ").strip()
+    status, info = _gh_request("GET", f"https://api.github.com/repos/{repo}", token)
+    if status != 200:
+        print(f"\nKein Zugriff auf {repo} (Fehler {status}). Stimmen Name und Schlüssel?")
+        return 1
+    if not info.get("private"):
+        print(f"\nAbbruch: {repo} ist öffentlich. Für Gesundheitsdaten muss das Repository privat sein.")
+        return 1
+    if not info.get("permissions", {}).get("push"):
+        print("\nDer Schlüssel darf nicht schreiben. Bitte bei „Contents“ „Read and write“ wählen.")
+        return 1
+    TOKEN_DIR.mkdir(exist_ok=True)
+    GITHUB_TOKEN_FILE.write_text(token, encoding="utf-8")
+    del token
+    secure_token_dir()
+    cfg["github_repo"] = repo
+    save_config(cfg)
+    print(f"\nEingerichtet. Ab jetzt landet data.json nach jedem Abruf auch privat in {repo}.")
+    print("Dieses Fenster kann geschlossen werden.")
+    return 0
+
+
+def upload_github(data_file: Path) -> bool | None:
+    """True = hochgeladen, False = Fehler, None = nicht eingerichtet."""
+    repo = load_config().get("github_repo")
+    if not repo or not GITHUB_TOKEN_FILE.exists():
+        return None
+    import base64
+    token = GITHUB_TOKEN_FILE.read_text(encoding="utf-8").strip()
+    url = f"https://api.github.com/repos/{repo}/contents/data.json"
+    status, cur = _gh_request("GET", url, token)
+    body = {"message": f"Garmin-Daten {dt.datetime.now():%Y-%m-%d %H:%M}",
+            "content": base64.b64encode(data_file.read_bytes()).decode()}
+    if status == 200 and cur.get("sha"):
+        body["sha"] = cur["sha"]
+    status, _ = _gh_request("PUT", url, token, body)
+    if status in (200, 201):
+        log.info("GitHub-Übergabe ok")
+        return True
+    log.error("GitHub-Übergabe fehlgeschlagen: HTTP %s", status)
+    return False
+
+
 # ---------------------------------------------------------------- Sync
 def cmd_sync(days: int, dry_run: bool, dashboard: bool) -> int:
     started = time.time()
@@ -519,6 +604,11 @@ def cmd_sync(days: int, dry_run: bool, dashboard: bool) -> int:
     log.info("Sync ok: %d Tage, %d mit Werten, %d Workouts, %.0f s",
              len(dates), len(with_values), len(acts), time.time() - started)
     print(f"Geschrieben nach: {root}")
+    up = upload_github(root / "data.json")
+    if up is True:
+        print("Auch ins private GitHub-Repository übertragen (für die App).")
+    elif up is False:
+        print("Achtung: Übertragung zu GitHub fehlgeschlagen, Details im Log.")
 
     if dashboard:
         import build_dashboard
@@ -540,6 +630,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Garmin-Daten lokal synchronisieren (nur lesend).")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("login", help="Einmaliger Login im Terminal")
+    sub.add_parser("github-login", help="Einmalig: Übergabe an die App über ein privates GitHub-Repository einrichten")
     s = sub.add_parser("sync", help="Daten abrufen")
     s.add_argument("--days", type=int, default=3)
     s.add_argument("--dry-run", action="store_true", help="nur anzeigen, nichts schreiben")
@@ -547,6 +638,8 @@ def main() -> int:
     a = p.parse_args()
     if a.cmd == "login":
         return cmd_login()
+    if a.cmd == "github-login":
+        return cmd_github_login()
     try:
         code = cmd_sync(max(1, a.days), a.dry_run, a.dashboard)
     except Exception as e:  # unerwarteter Fehler: festhalten, ohne Details, die Daten enthalten könnten

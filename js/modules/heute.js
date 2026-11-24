@@ -1,5 +1,5 @@
 // Startseite: Wochenstand, Belastung, Hinweise, Schnellstart.
-import { h, card, stat, badge, fmt, empty } from '../core/ui.js';
+import { h, card, stat, badge, fmt, empty, toast } from '../core/ui.js';
 import { ICONS } from '../core/icons.js';
 import { startOfWeek, fmtDate, isoWeek } from '../core/dates.js';
 import { weekSummary, acwr, acwrStatus } from '../science/load.js';
@@ -11,6 +11,7 @@ import { ymd, addDays } from '../core/dates.js';
 import { sparkline } from '../core/charts.js';
 import { abendCard } from './abend.js';
 import { ernaehrungCard } from './ernaehrung.js';
+import { autoImport, remoteConfigured, fmtStand } from '../core/garminRemote.js';
 
 // Erholungswerte der letzten 14 Tage, kompakt als Zeilen: Name | Wert | Verlauf
 const METRICS = [
@@ -62,7 +63,14 @@ function tagesformCard(ctx) {
       h('div', { class: 'tf-src muted small' }, r.manual ? 'selbst eingestuft' : r.date ? `Garmin ${fmtDate(r.date, false)}` : '')),
     h('div', { class: 'tf-advice' }, advice(r.level).map((t) => h('p', { class: 'small' }, t))),
     rows,
-    h('button', { class: `btn ${needImport ? 'primary' : 'ghost'} full`, onclick: () => ctx.go('garmin') }, '↻ Garmin-Daten importieren'),
+    remoteConfigured(p)
+      ? h('button', { class: `btn ${needImport ? 'primary' : 'ghost'} full`, onclick: async (e) => {
+        const b = e.currentTarget; b.disabled = true; b.textContent = 'Wird abgerufen …';
+        const res = await autoImport(ctx.store, { force: true });
+        ctx.rerender();
+        toast(res.text || 'Fertig.');
+      } }, `↻ Garmin-Daten aktualisieren${p.garminImport && p.garminImport.stand ? ` (Stand ${fmtStand(p.garminImport.stand)})` : ''}`)
+      : h('button', { class: `btn ${needImport ? 'primary' : 'ghost'} full`, onclick: () => ctx.go('garmin') }, '↻ Garmin-Daten importieren'),
     h('details', { class: 'details' }, h('summary', {}, 'Warum diese Einstufung?'),
       r.signals.length ? h('ul', { class: 'hints' }, r.signals.map((x) => h('li', {}, badge(x.points === 0 ? 'good' : x.points === 1 ? 'warning' : 'serious', ''), h('span', {}, x.text)))) : h('p', { class: 'small' }, r.reason || ''),
       rows ? h('p', { class: 'muted small' }, 'Verläufe der letzten 14 Tage. Graues Band = dein Normalbereich, Linie beim Schlaf = 7 h. Tippe auf einen Verlauf für den Tageswert.') : null,

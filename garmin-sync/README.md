@@ -33,3 +33,20 @@ Nur lesend: Es wird nie etwas ins Garmin-Konto geschrieben.
 Standard: macOS → iCloud Drive/GARMIN, Windows → OneDrive/GARMIN.
 Anderer Ort: `config.json` neben dem Script mit `{"output_dir": "/pfad/zum/ordner"}`.
 Das Login-Token bleibt immer im Projektordner und gehört nie in einen Cloud-Ordner.
+
+## Automatische Übergabe an die App (optional, empfohlen)
+
+Statt die `data.json` jeden Morgen in der Dateien-App auszuwählen, kann der PC sie zusätzlich
+in ein **privates** GitHub-Repository legen. Die Trainings-App holt sie dort beim Öffnen selbst ab.
+
+1. Auf GitHub ein **privates** Repository anlegen, z. B. `garmin-daten` (leer, ohne README).
+2. Zwei Fine-grained-Schlüssel anlegen (GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens),
+   jeweils nur für dieses eine Repository:
+   - **PC:** Repository permissions → Contents: *Read and write*
+   - **iPhone:** Repository permissions → Contents: *Read-only*
+3. Am PC `github_login.bat` per Doppelklick starten, Repository (`Besitzer/garmin-daten`) und den PC-Schlüssel
+   eingeben. Die Eingabe ist unsichtbar, der Schlüssel liegt danach nur im geschützten Ordner `.garminconnect`.
+   Das Script verweigert öffentliche Repositories.
+4. In der App: Profil → Garmin → „Automatischer Abruf einrichten“, Repository und iPhone-Schlüssel eintragen.
+
+Ab dann lädt jeder Sync die Datei hoch, und die App übernimmt sie beim Öffnen automatisch.

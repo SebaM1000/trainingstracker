@@ -1,6 +1,6 @@
 // Service Worker: speichert die App für den Offline-Betrieb.
 // Nach Änderungen an Dateien VERSION erhöhen, damit Geräte die neue Fassung laden.
-const VERSION = 'v1.10.3';
+const VERSION = 'v1.11.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/core/store.js', './js/core/registry.js', './js/core/ui.js', './js/core/charts.js',
@@ -25,6 +25,7 @@ self.addEventListener('activate', (e) => {
 // Netz zuerst (damit Updates sofort ankommen), bei fehlender Verbindung aus dem Cache
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  if (new URL(e.request.url).origin !== self.location.origin) return; // z. B. GitHub-API: nie in den Cache
   e.respondWith(
     fetch(e.request).then((res) => {
       const copy = res.clone();
